@@ -1,13 +1,17 @@
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut } from "lucide-react";
+import { User, LogOut, Settings, Bell } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const breadcrumbMap: Record<string, string> = {
@@ -21,42 +25,76 @@ export function AppHeader() {
   const currentPage = breadcrumbMap[location.pathname] || "Página";
 
   return (
-    <header className="h-14 flex items-center justify-between border-b px-4 bg-background">
-      <div className="flex items-center gap-3">
-        <SidebarTrigger />
-        <Separator orientation="vertical" className="h-5" />
-        <nav className="flex items-center gap-1.5 text-sm">
-          <span className="text-muted-foreground">Início</span>
+    <header className="h-16 flex items-center justify-between border-b px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="flex items-center gap-4">
+        <SidebarTrigger className="hover:bg-accent" />
+        <Separator orientation="vertical" className="h-6" />
+        <nav className="flex items-center gap-2 text-sm">
+          {currentPage !== "Dashboard" ? (
+            <Link
+              to="/"
+              className="text-muted-foreground font-medium hover:text-foreground transition-colors"
+            >
+              Início
+            </Link>
+          ) : (
+            <span className="text-muted-foreground font-medium">Início</span>
+          )}
           {currentPage !== "Dashboard" && (
             <>
-              <span className="text-muted-foreground">/</span>
-              <span className="font-medium text-foreground">{currentPage}</span>
+              <span className="text-muted-foreground/40">/</span>
+              <span className="font-semibold text-foreground">{currentPage}</span>
             </>
           )}
         </nav>
       </div>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
-            <Avatar className="h-8 w-8 cursor-pointer">
-              <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold">
-                AD
-              </AvatarFallback>
-            </Avatar>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-44">
-          <DropdownMenuItem>
-            <User className="mr-2 h-4 w-4" />
-            Perfil
-          </DropdownMenuItem>
-          <DropdownMenuItem className="text-destructive">
-            <LogOut className="mr-2 h-4 w-4" />
-            Sair
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="icon" className="relative hover:bg-accent">
+          <Bell className="h-4 w-4" />
+          <Badge 
+            variant="destructive" 
+            className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
+          >
+            3
+          </Badge>
+        </Button>
+        
+        <Separator orientation="vertical" className="h-6" />
+        
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-3 rounded-full hover:bg-accent transition-colors p-1.5 pr-3 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+              <Avatar className="h-8 w-8 ring-2 ring-primary/10">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-emerald-700 text-primary-foreground text-xs font-bold">
+                  AD
+                </AvatarFallback>
+              </Avatar>
+              <div className="hidden md:block text-left">
+                <p className="text-sm font-semibold text-foreground">Admin</p>
+                <p className="text-xs text-muted-foreground">admin@zenite.com</p>
+              </div>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="cursor-pointer">
+              <User className="mr-2 h-4 w-4" />
+              Perfil
+            </DropdownMenuItem>
+            <DropdownMenuItem className="cursor-pointer">
+              <Settings className="mr-2 h-4 w-4" />
+              Configurações
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive cursor-pointer">
+              <LogOut className="mr-2 h-4 w-4" />
+              Sair
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </header>
   );
 }
