@@ -1,7 +1,8 @@
-import { Users, GraduationCap, Sun, TrendingUp, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Users, GraduationCap, Sun, TrendingUp, ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { students, enrollmentsByMonth, grades } from "@/data/mockData";
+import { dashboardApi, alunosApi } from "@/lib/api";
 import {
   BarChart,
   Bar,
@@ -13,19 +14,59 @@ import {
   Area,
   AreaChart,
 } from "recharts";
+import { Loader2 } from "lucide-react";
 
 export default function Dashboard() {
-  const activeStudents = students.filter((s) => s.status === "Ativo").length;
-  const morningCount = students.filter((s) => s.shift === "Manhã").length;
-  const afternoonCount = students.filter((s) => s.shift === "Tarde").length;
+  const { data: metrics, isLoading, error } = useQuery({
+    queryKey: ["dashboard-metrics"],
+    queryFn: () => dashboardApi.getMetrics(),
+  });
 
-  const gradeDistribution = grades.map((grade) => ({
-    grade,
-    count: students.filter((s) => s.grade === grade).length,
-  }));
+  const { data: alunosData } = useQuery({
+    queryKey: ["alunos", "all"],
+    queryFn: () => alunosApi.list({ limit: 100 }),
+  });
+
+  const students = alunosData?.items || [];
+  const activeStudents = metrics?.total_alunos_ativos || 0;
+  const morningCount = metrics?.alunos_manhã || 0;
+  const afternoonCount = metrics?.alunos_tarde || 0;
+
+  const gradeDistribution = metrics?.por_serie || [];
+
+  const enrollmentsByMonth = [
+    { month: "Jan", count: 12 },
+    { month: "Fev", count: 18 },
+    { month: "Mar", count: 25 },
+    { month: "Abr", count: 8 },
+    { month: "Mai", count: 5 },
+    { month: "Jun", count: 3 },
+    { month: "Jul", count: 2 },
+    { month: "Ago", count: 7 },
+    { month: "Set", count: 4 },
+    { month: "Out", count: 6 },
+    { month: "Nov", count: 3 },
+    { month: "Dez", count: 1 },
+  ];
 
   const totalEnrollments = enrollmentsByMonth.reduce((sum, month) => sum + month.count, 0);
   const avgEnrollments = Math.round(totalEnrollments / enrollmentsByMonth.length);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <p className="text-destructive">Erro ao carregar dados do dashboard.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-7xl">
@@ -106,7 +147,7 @@ export default function Dashboard() {
               <div
                 className="h-full bg-gradient-to-r from-amber-500 to-amber-600 rounded-full transition-all duration-500"
                 style={{
-                  width: `${(morningCount / students.length) * 100}%`,
+                  width: students.length > 0 ? `${(morningCount / students.length) * 100}%` : '0%',
                 }}
               />
             </div>
@@ -132,7 +173,7 @@ export default function Dashboard() {
               <div
                 className="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all duration-500"
                 style={{
-                  width: `${(afternoonCount / students.length) * 100}%`,
+                  width: students.length > 0 ? `${(afternoonCount / students.length) * 100}%` : '0%',
                 }}
               />
             </div>
@@ -216,15 +257,15 @@ export default function Dashboard() {
             <div className="space-y-4">
               {gradeDistribution.map((g, idx) => (
                 <div 
-                  key={g.grade} 
+                  key={g.serie} 
                   className="group animate-fade-in"
                   style={{ animationDelay: `${idx * 0.05}s` }}
                 >
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="font-medium text-foreground">{g.grade}</span>
+                    <span className="font-medium text-foreground">{g.serie}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">
-                        {Math.round((g.count / students.length) * 100)}%
+                        {students.length > 0 ? Math.round((g.count / students.length) * 100) : 0}%
                       </span>
                       <Badge variant="secondary" className="bg-primary/10 text-primary">
                         {g.count}
@@ -235,12 +276,17 @@ export default function Dashboard() {
                     <div
                       className="h-full bg-gradient-to-r from-primary via-emerald-600 to-emerald-700 rounded-full transition-all duration-700 ease-out group-hover:brightness-110"
                       style={{
-                        width: `${(g.count / students.length) * 100}%`,
+                        width: students.length > 0 ? `${(g.count / students.length) * 100}%` : '0%',
                       }}
                     />
                   </div>
                 </div>
               ))}
+              {gradeDistribution.length === 0 && (
+                <p className="text-muted-foreground text-sm text-center py-4">
+                  Nenhum dado disponível
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

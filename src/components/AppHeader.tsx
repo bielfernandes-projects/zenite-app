@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { User, LogOut, Settings, Bell } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { useAuth } from "@/contexts/AuthContext";
 
 const breadcrumbMap: Record<string, string> = {
   "/": "Dashboard",
@@ -22,7 +23,18 @@ const breadcrumbMap: Record<string, string> = {
 
 export function AppHeader() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const currentPage = breadcrumbMap[location.pathname] || "Página";
+
+  const userName = user?.email?.split("@")[0] || "Admin";
+  const userEmail = user?.email || "";
+  const userInitials = userName.slice(0, 2).toUpperCase();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/login");
+  };
 
   return (
     <header className="h-16 flex items-center justify-between border-b px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -67,12 +79,12 @@ export function AppHeader() {
             <button className="flex items-center gap-3 rounded-full hover:bg-accent transition-colors p-1.5 pr-3 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
               <Avatar className="h-8 w-8 ring-2 ring-primary/10">
                 <AvatarFallback className="bg-gradient-to-br from-primary to-emerald-700 text-primary-foreground text-xs font-bold">
-                  AD
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden md:block text-left">
-                <p className="text-sm font-semibold text-foreground">Admin</p>
-                <p className="text-xs text-muted-foreground">admin@zenite.com</p>
+                <p className="text-sm font-semibold text-foreground capitalize">{userName}</p>
+                <p className="text-xs text-muted-foreground">{userEmail}</p>
               </div>
             </button>
           </DropdownMenuTrigger>
@@ -88,7 +100,7 @@ export function AppHeader() {
               Configurações
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-destructive cursor-pointer">
+            <DropdownMenuItem className="text-destructive cursor-pointer" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               Sair
             </DropdownMenuItem>

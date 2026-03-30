@@ -1,5 +1,7 @@
-import { useState, useMemo } from "react";
-import { Search, Plus, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Search, Plus, MoreHorizontal, Pencil, Trash2, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -27,26 +29,44 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { StudentForm } from "@/components/StudentForm";
-import { students as initialStudents, grades, shifts } from "@/data/mockData";
-import type { Student } from "@/data/mockData";
+import { alunosApi, Aluno } from "@/lib/api";
 import { toast } from "sonner";
 
+const grades = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"];
+const shifts = ["Manhã", "Tarde", "Integral"] as const;
+
 export default function Students() {
-  const [data, setData] = useState<Student[]>(initialStudents);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [shiftFilter, setShiftFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Aluno | null>(null);
 
-  const filtered = useMemo(() => {
-    return data.filter((s) => {
-      const matchSearch = s.name.toLowerCase().includes(search.toLowerCase());
-      const matchGrade = gradeFilter === "all" || s.grade === gradeFilter;
-      const matchShift = shiftFilter === "all" || s.shift === shiftFilter;
-      return matchSearch && matchGrade && matchShift;
-    });
-  }, [data, search, gradeFilter, shiftFilter]);
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["alunos", search, gradeFilter, shiftFilter],
+    queryFn: () => alunosApi.list({ 
+      search: search || undefined,
+      serie: gradeFilter !== "all" ? gradeFilter : undefined
+    }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => alunosApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["alunos"] });
+      toast.success("Aluno removido com sucesso!");
+    },
+    onError: () => {
+      toast.error("Erro ao excluir aluno");
+    },
+  });
+
+  const filtered = (data?.items || []).filter((s) => {
+    const matchShift = shiftFilter === "all" || s.turno === shiftFilter;
+    return matchShift;
+  });
 
   const getInitials = (name: string) =>
     name
@@ -56,29 +76,13 @@ export default function Students() {
       .join("")
       .toUpperCase();
 
-  const handleSave = (formData: Record<string, unknown>) => {
-    if (editingStudent) {
-      setData((prev) =>
-        prev.map((s) =>
-          s.id === editingStudent.id ? { ...s, ...formData } as Student : s
-        )
-      );
-    } else {
-      const newStudent: Student = {
-        ...(formData as Omit<Student, "id" | "photo" | "status" | "guardian">),
-        id: String(Date.now()),
-        photo: "",
-        status: "Ativo",
-        guardian: (formData.motherName as string) || "",
-      } as Student;
-      setData((prev) => [...prev, newStudent]);
-    }
+  const handleSave = () => {
     setEditingStudent(null);
+    queryClient.invalidateQueries({ queryKey: ["alunos"] });
   };
 
   const handleDelete = (id: string) => {
-    setData((prev) => prev.filter((s) => s.id !== id));
-    toast.success("Aluno removido com sucesso!");
+    deleteMutation.mutate(id);
   };
 
   return (
@@ -131,95 +135,112 @@ export default function Students() {
           </Select>
         </div>
 
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12"></TableHead>
-              <TableHead>Nome</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Série</TableHead>
-              <TableHead>Turno</TableHead>
-              <TableHead className="hidden md:table-cell">Responsável</TableHead>
-              <TableHead className="hidden md:table-cell">Telefone</TableHead>
-              <TableHead className="w-10"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filtered.map((student) => (
-              <TableRow key={student.id}>
-                <TableCell>
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
-                      {getInitials(student.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                </TableCell>
-                <TableCell className="font-semibold text-foreground">
-                  {student.name}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={student.status === "Ativo" ? "default" : "secondary"}
-                    className={
-                      student.status === "Ativo"
-                        ? "bg-success/10 text-success border-success/20 hover:bg-success/20"
-                        : "bg-muted text-muted-foreground"
-                    }
-                  >
-                    {student.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground">{student.grade}</TableCell>
-                <TableCell className="text-muted-foreground">{student.shift}</TableCell>
-                <TableCell className="hidden md:table-cell text-muted-foreground">
-                  {student.guardian}
-                </TableCell>
-                <TableCell className="hidden md:table-cell text-muted-foreground">
-                  {student.phone}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setEditingStudent(student);
-                          setFormOpen(true);
-                        }}
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Editar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => handleDelete(student.id)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filtered.length === 0 && (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-12 text-destructive">
+            Erro ao carregar alunos. Tente novamente.
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                  Nenhum aluno encontrado.
-                </TableCell>
+                <TableHead className="w-12"></TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Série</TableHead>
+                <TableHead>Turno</TableHead>
+                <TableHead className="hidden md:table-cell">Responsável</TableHead>
+                <TableHead className="hidden md:table-cell">Telefone</TableHead>
+                <TableHead className="w-10"></TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((student) => (
+                <TableRow 
+                  key={student.id} 
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => navigate(`/alunos/${student.id}`)}
+                >
+                  <TableCell>
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                        {getInitials(student.nome)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </TableCell>
+                  <TableCell className="font-semibold text-foreground">
+                    {student.nome}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={student.situacao === "Ativo" ? "default" : "secondary"}
+                      className={
+                        student.situacao === "Ativo"
+                          ? "bg-success/10 text-success border-success/20 hover:bg-success/20"
+                          : "bg-muted text-muted-foreground"
+                      }
+                    >
+                      {student.situacao}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{student.serie}</TableCell>
+                  <TableCell className="text-muted-foreground">{student.turno}</TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                    {student.responsavelfinanceiro || student.nomedamae || "—"}
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell text-muted-foreground">
+                    {student.telefone1}
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditingStudent(student);
+                            setFormOpen(true);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => handleDelete(student.id)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Excluir
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                    Nenhum aluno encontrado.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
       </Card>
 
       <StudentForm
         open={formOpen}
-        onOpenChange={setFormOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setEditingStudent(null);
+        }}
         student={editingStudent}
         onSave={handleSave}
       />

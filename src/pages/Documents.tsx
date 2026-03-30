@@ -26,6 +26,7 @@ import {
 import { students, documentTypes } from "@/data/mockData";
 import type { Student } from "@/data/mockData";
 import { toast } from "sonner";
+import { api } from "@/lib/api";
 
 export default function Documents() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -33,16 +34,29 @@ export default function Documents() {
   const [comboOpen, setComboOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!selectedStudent || !docType) {
       toast.error("Selecione um aluno e o tipo de documento.");
       return;
     }
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    
+    try {
+      const blob = await api.generate(docType, selectedStudent.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${docType}_${selectedStudent.name.replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
       toast.success("Documento gerado com sucesso!");
-    }, 2000);
+    } catch {
+      toast.error("Erro ao gerar documento. Tente novamente.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const docLabel = documentTypes.find((d) => d.value === docType)?.label;

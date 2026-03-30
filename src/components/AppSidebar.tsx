@@ -1,6 +1,7 @@
-import { LayoutDashboard, Users, FileText, Sparkles } from "lucide-react";
+import { LayoutDashboard, Users, FileText, Sparkles, LogOut } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +14,8 @@ import {
   SidebarFooter,
   useSidebar,
 } from "@/components/ui/sidebar";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -24,6 +27,12 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    toast.success("Logout realizado com sucesso");
+  };
 
   return (
     <Sidebar collapsible="icon" className="border-r-0 shadow-xl">
@@ -83,13 +92,21 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      {!collapsed && (
-        <SidebarFooter className="p-4 border-t border-sidebar-border">
-          <div className="text-xs text-sidebar-foreground/60 text-center">
+      <SidebarFooter className="p-4 border-t border-sidebar-border">
+        <Button
+          variant="ghost"
+          className={`w-full justify-${collapsed ? 'center' : 'start'} text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent`}
+          onClick={handleLogout}
+        >
+          <LogOut className="h-4 w-4" />
+          {!collapsed && <span className="ml-2">Sair</span>}
+        </Button>
+        {!collapsed && (
+          <div className="text-xs text-sidebar-foreground/60 text-center mt-2">
             v1.0.0
           </div>
-        </SidebarFooter>
-      )}
+        )}
+      </SidebarFooter>
     </Sidebar>
   );
 }
