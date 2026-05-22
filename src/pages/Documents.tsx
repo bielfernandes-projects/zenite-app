@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { FileDown, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -23,16 +24,27 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { students, documentTypes } from "@/data/mockData";
-import type { Student } from "@/data/mockData";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { alunosApi, documentosApi, Aluno } from "@/lib/api";
+
+const documentTypes = [
+  { value: "declaracao", label: "Declaração de Matrícula" },
+  { value: "recibo", label: "Recibo de Pagamento" },
+  { value: "historico", label: "Histórico Escolar" },
+];
 
 export default function Documents() {
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [selectedStudent, setSelectedStudent] = useState<Aluno | null>(null);
   const [docType, setDocType] = useState("");
   const [comboOpen, setComboOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const { data: alunos } = useQuery({
+    queryKey: ["alunos", "documentos"],
+    queryFn: () => alunosApi.list({ limit: 500 }),
+  });
+
+  const alunosAtivos = (alunos?.items || []).filter((s) => s.situacao === "Ativo");
 
   const handleGenerate = async () => {
     if (!selectedStudent || !docType) {
@@ -40,13 +52,13 @@ export default function Documents() {
       return;
     }
     setLoading(true);
-    
+
     try {
-      const blob = await api.generate(docType, selectedStudent.id);
+      const blob = await documentosApi.generate(docType, selectedStudent);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${docType}_${selectedStudent.name.replace(/\s+/g, "_")}.pdf`;
+      a.download = `${docType}_${selectedStudent.nome.replace(/\s+/g, "_")}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -58,6 +70,9 @@ export default function Documents() {
       setLoading(false);
     }
   };
+
+  const formatCurrency = (value?: number) =>
+    value ? `R$ ${value.toFixed(2).replace(".", ",")}` : "—";
 
   const docLabel = documentTypes.find((d) => d.value === docType)?.label;
 
@@ -83,7 +98,7 @@ export default function Documents() {
                     className="w-full justify-start font-normal rounded-lg"
                   >
                     {selectedStudent
-                      ? selectedStudent.name
+                      ? selectedStudent.nome
                       : "Buscar aluno..."}
                   </Button>
                 </PopoverTrigger>
@@ -93,19 +108,17 @@ export default function Documents() {
                     <CommandList>
                       <CommandEmpty>Nenhum aluno encontrado.</CommandEmpty>
                       <CommandGroup>
-                        {students
-                          .filter((s) => s.status === "Ativo")
-                          .map((s) => (
-                            <CommandItem
-                              key={s.id}
-                              onSelect={() => {
-                                setSelectedStudent(s);
-                                setComboOpen(false);
-                              }}
-                            >
-                              {s.name}
-                            </CommandItem>
-                          ))}
+                        {alunosAtivos.map((s) => (
+                          <CommandItem
+                            key={s.id}
+                            onSelect={() => {
+                              setSelectedStudent(s);
+                              setComboOpen(false);
+                            }}
+                          >
+                            {s.nome}
+                          </CommandItem>
+                        ))}
                       </CommandGroup>
                     </CommandList>
                   </Command>
@@ -164,25 +177,25 @@ export default function Documents() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Nome</span>
-                      <span className="font-medium text-foreground">{selectedStudent.name}</span>
+                      <span className="font-medium text-foreground">{selectedStudent.nome}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Série</span>
-                      <span className="font-medium text-foreground">{selectedStudent.grade}</span>
+                      <span className="font-medium text-foreground">{selectedStudent.serie}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Turno</span>
-                      <span className="font-medium text-foreground">{selectedStudent.shift}</span>
+                      <span className="font-medium text-foreground">{selectedStudent.turno}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Responsável</span>
-                      <span className="font-medium text-foreground">{selectedStudent.guardian}</span>
+                      <span className="font-medium text-foreground">{selectedStudent.responsavelfinanceiro || "—"}</span>
                     </div>
                     {docType === "recibo" && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Mensalidade</span>
                         <span className="font-medium text-foreground">
-                          R$ {selectedStudent.monthlyFee.toFixed(2)}
+                          {formatCurrency(selectedStudent.valormensalidade)}
                         </span>
                       </div>
                     )}

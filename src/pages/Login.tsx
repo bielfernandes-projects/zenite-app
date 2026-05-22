@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 export default function Login() {
   const navigate = useNavigate();
-  const { signIn, isDemoMode } = useAuth();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -98,11 +98,6 @@ export default function Login() {
             </form>
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Escola Zênite • 2024
-              {isDemoMode && (
-                <span className="block mt-1 text-amber-600">
-                  Modo demo • Credenciais ignoradas
-                </span>
-              )}
             </p>
           </CardContent>
         </Card>
