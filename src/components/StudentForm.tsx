@@ -32,6 +32,9 @@ const studentSchema = z.object({
   nome: z.string().min(3, "Nome deve ter ao menos 3 caracteres").max(100),
   serie: z.string().min(1, "Selecione a série"),
   turno: z.enum(["Manhã", "Tarde", "Integral"]),
+  ano_letivo: z.coerce.number().optional(),
+  genero: z.string().optional(),
+  status: z.string().optional(),
   anodamatricula: z.coerce.number().optional(),
   datadamatricula: z.string().optional(),
   datanascimento: z.string().optional(),
@@ -137,6 +140,9 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
         nome: student.nome,
         serie: student.serie,
         turno: student.turno,
+        ano_letivo: student.ano_letivo,
+        genero: student.genero,
+        status: student.status,
         anodamatricula: student.anodamatricula,
         datadamatricula: student.datadamatricula,
         datanascimento: student.datanascimento,
@@ -223,7 +229,7 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
                 <Input id="nome" {...register("nome")} className={fieldClass} />
                 {errors.nome && <p className="text-xs text-destructive mt-1">{errors.nome.message}</p>}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <Label>Série *</Label>
                   <Select value={student?.serie} onValueChange={(v) => setValue("serie", v)}>
@@ -239,6 +245,32 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
                     <SelectTrigger className={fieldClass}><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
                       {shifts.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="ano_letivo">Ano Letivo</Label>
+                  <Input id="ano_letivo" type="number" {...register("ano_letivo")} className={fieldClass} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label>Gênero</Label>
+                  <Select value={student?.genero} onValueChange={(v) => setValue("genero", v)}>
+                    <SelectTrigger className={fieldClass}><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Masculino">Masculino</SelectItem>
+                      <SelectItem value="Feminino">Feminino</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Status</Label>
+                  <Select value={student?.status} onValueChange={(v) => setValue("status", v)}>
+                    <SelectTrigger className={fieldClass}><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Ativo">Ativo</SelectItem>
+                      <SelectItem value="Inativo">Inativo</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

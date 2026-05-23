@@ -3,6 +3,9 @@ import { supabase } from "@/lib/supabase";
 export interface Aluno {
   id: string;
   nome: string;
+  genero?: string;
+  ano_letivo?: number;
+  status?: string;
   serie: string;
   turno: string;
   anodamatricula?: number;
@@ -125,7 +128,7 @@ export const dashboardApi = {
     });
 
     return {
-      total_alunos_ativos: all.filter((a) => a.situacao === "Ativo").length,
+      total_alunos_ativos: all.filter((a) => (a.status || a.situacao) === "Ativo").length,
       alunos_inadimplentes: 0,
       alunos_manhã: all.filter((a) => a.turno === "Manhã").length,
       alunos_tarde: all.filter((a) => a.turno === "Tarde").length,

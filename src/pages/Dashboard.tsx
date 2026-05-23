@@ -13,6 +13,7 @@ import {
   ResponsiveContainer,
   Area,
   AreaChart,
+  Legend,
 } from "recharts";
 import { Loader2 } from "lucide-react";
 
@@ -51,6 +52,24 @@ export default function Dashboard() {
 
   const totalEnrollments = enrollmentsByMonth.reduce((sum, month) => sum + month.count, 0);
   const avgEnrollments = Math.round(totalEnrollments / enrollmentsByMonth.length);
+
+  const seriesOrder = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"];
+  const turnosOrder = ["Manhã", "Tarde", "Integral"];
+  const turnoLabel: Record<string, string> = { "Manhã": "M", "Tarde": "T", "Integral": "I" };
+
+  const genderBySerieTurno = seriesOrder.flatMap((serie) =>
+    turnosOrder.map((turno) => {
+      const alunos = students.filter((s) => s.serie === serie && s.turno === turno);
+      const masculino = alunos.filter((s) => s.genero === "Masculino").length;
+      const feminino = alunos.filter((s) => s.genero === "Feminino").length;
+      return {
+        name: `${serie} - ${turnoLabel[turno]}`,
+        masculino,
+        feminino,
+        total: masculino + feminino,
+      };
+    }).filter((item) => item.total > 0)
+  );
 
   if (isLoading) {
     return (
@@ -291,6 +310,93 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Gender by Serie & Turno */}
+      <Card className="border-none shadow-lg animate-slide-up">
+        <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg font-semibold text-foreground">
+                Alunos por Gênero, Série e Turno
+              </CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Distribuição de alunos e alunas
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {genderBySerieTurno.length > 0 ? (
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={genderBySerieTurno}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(150, 12%, 88%)" vertical={false} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 11, fill: "hsl(156, 10%, 42%)" }}
+                  axisLine={false}
+                  tickLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 12, fill: "hsl(156, 10%, 42%)" }}
+                  axisLine={false}
+                  tickLine={false}
+                  allowDecimals={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    borderRadius: "0.75rem",
+                    border: "1px solid hsl(150, 12%, 88%)",
+                    fontSize: "0.875rem",
+                    backgroundColor: "hsl(0, 0%, 100%)",
+                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                  }}
+                  formatter={(value: number, name: string) => [
+                    value,
+                    name === "masculino" ? "Meninos" : "Meninas",
+                  ]}
+                />
+                <Legend
+                  formatter={(value: string) => (value === "masculino" ? "Meninos" : "Meninas")}
+                />
+                <Bar
+                  stackId="a"
+                  dataKey="masculino"
+                  fill="#3B82F6"
+                  name="masculino"
+                  radius={[0, 0, 0, 0]}
+                  label={({ value, x, y, width, height }) => {
+                    if (value === 0) return null;
+                    return (
+                      <text x={x + width / 2} y={y + height / 2} textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize={11} fontWeight={600}>
+                        {value}
+                      </text>
+                    );
+                  }}
+                />
+                <Bar
+                  stackId="a"
+                  dataKey="feminino"
+                  fill="#EC4899"
+                  name="feminino"
+                  radius={[0, 0, 0, 0]}
+                  label={({ value, x, y, width, height }) => {
+                    if (value === 0) return null;
+                    return (
+                      <text x={x + width / 2} y={y + height / 2} textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize={11} fontWeight={600}>
+                        {value}
+                      </text>
+                    );
+                  }}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-muted-foreground text-sm text-center py-8">
+              Nenhum dado disponível
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

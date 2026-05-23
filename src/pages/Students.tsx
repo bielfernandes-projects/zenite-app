@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Plus, MoreHorizontal, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Pencil, Trash2, Loader2, FileDown, List } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -17,8 +16,16 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -30,6 +37,9 @@ import {
 import { Card } from "@/components/ui/card";
 import { StudentForm } from "@/components/StudentForm";
 import { alunosApi, Aluno } from "@/lib/api";
+import jsPDF from "jspdf";
+import { applyPlugin } from "jspdf-autotable";
+applyPlugin(jsPDF);
 import { toast } from "sonner";
 
 const grades = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"];
@@ -41,11 +51,15 @@ export default function Students() {
   const [search, setSearch] = useState("");
   const [gradeFilter, setGradeFilter] = useState("all");
   const [shiftFilter, setShiftFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Aluno | null>(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [serieDialogOpen, setSerieDialogOpen] = useState(false);
+  const [selectedSerie, setSelectedSerie] = useState("");
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["alunos", search, gradeFilter, shiftFilter],
+    queryKey: ["alunos", search, gradeFilter],
     queryFn: () => alunosApi.list({ 
       search: search || undefined,
       serie: gradeFilter !== "all" ? gradeFilter : undefined
@@ -65,16 +79,9 @@ export default function Students() {
 
   const filtered = (data?.items || []).filter((s) => {
     const matchShift = shiftFilter === "all" || s.turno === shiftFilter;
-    return matchShift;
+    const matchStatus = statusFilter === "all" || (s.status || s.situacao) === statusFilter;
+    return matchShift && matchStatus;
   });
-
-  const getInitials = (name: string) =>
-    name
-      .split(" ")
-      .slice(0, 2)
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
 
   const handleSave = () => {
     setEditingStudent(null);
@@ -85,56 +92,146 @@ export default function Students() {
     deleteMutation.mutate(id);
   };
 
+  const generatePDF = useCallback(async (students: Aluno[], title: string) => {
+    setPdfLoading(true);
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 14;
+
+      doc.setFontSize(16);
+      doc.setFont("helvetica", "bold");
+      doc.text("Zênite - Sistema de Gestão Escolar", pageWidth / 2, margin, { align: "center" });
+
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "normal");
+      doc.text(title, pageWidth / 2, margin + 8, { align: "center" });
+
+      doc.setFontSize(9);
+      doc.text(`Total de alunos: ${students.length}`, margin, margin + 16);
+      doc.text(`Emitido em: ${new Date().toLocaleDateString("pt-BR")}`, pageWidth - margin, margin + 16, { align: "right" });
+
+      const tableColumn = ["Nome", "Série", "Turno", "Responsável", "Telefone 1", "Telefone 2"];
+      const tableRows = students.map((s) => [
+        s.nome,
+        s.serie || "—",
+        s.turno || "—",
+        s.responsavelfinanceiro || s.nomedamae || "—",
+        s.telefone1 || "—",
+        s.telefone2 || "—",
+      ]);
+
+      doc.autoTable({
+        head: [tableColumn],
+        body: tableRows,
+        startY: margin + 22,
+        margin: { horizontal: margin },
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [21, 43, 33], textColor: 255, fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [240, 245, 242] },
+      });
+
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${title.replace(/\s+/g, "_")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Lista gerada com sucesso!");
+    } catch (e) {
+      console.error("Erro ao gerar PDF:", e);
+      toast.error("Erro ao gerar PDF. Tente novamente.");
+    } finally {
+      setPdfLoading(false);
+    }
+  }, []);
+
+  const handleGeral = () => generatePDF(filtered, "Alunos Matriculados");
+  const handleMasculina = () => {
+    const filteredByGender = filtered.filter((s) => s.genero === "Masculino");
+    if (filteredByGender.length === 0) {
+      toast.error("Nenhum aluno do gênero masculino encontrado.");
+      return;
+    }
+    generatePDF(filteredByGender, "Lista Masculina");
+  };
+  const handleFeminina = () => {
+    const filteredByGender = filtered.filter((s) => s.genero === "Feminino");
+    if (filteredByGender.length === 0) {
+      toast.error("Nenhum aluno do gênero feminino encontrado.");
+      return;
+    }
+    generatePDF(filteredByGender, "Lista Feminina");
+  };
+  const handlePorSerie = () => setSerieDialogOpen(true);
+
+  const handleSerieConfirm = () => {
+    if (!selectedSerie) {
+      toast.error("Selecione uma série.");
+      return;
+    }
+    const filteredBySerie = filtered.filter((s) => s.serie === selectedSerie);
+    if (filteredBySerie.length === 0) {
+      toast.error("Nenhum aluno encontrado para esta série.");
+      return;
+    }
+    generatePDF(filteredBySerie, `Alunos - ${selectedSerie}`);
+    setSerieDialogOpen(false);
+    setSelectedSerie("");
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <h2 className="text-2xl font-semibold text-foreground">Alunos</h2>
-        <Button
-          onClick={() => {
-            setEditingStudent(null);
-            setFormOpen(true);
-          }}
-        >
-          <Plus className="h-4 w-4 mr-1" />
-          Novo Aluno
-        </Button>
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={pdfLoading}>
+                {pdfLoading ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <FileDown className="h-4 w-4 mr-1" />
+                )}
+                Gerar Lista
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={handleGeral}>
+                <List className="mr-2 h-4 w-4" />
+                Alunos Matriculados (Geral)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleMasculina}>
+                <List className="mr-2 h-4 w-4" />
+                Lista Masculina
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleFeminina}>
+                <List className="mr-2 h-4 w-4" />
+                Lista Feminina
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handlePorSerie}>
+                <List className="mr-2 h-4 w-4" />
+                Por Série
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            onClick={() => {
+              setEditingStudent(null);
+              setFormOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            Novo Aluno
+          </Button>
+        </div>
       </div>
 
-      <Card className="shadow-sm rounded-xl">
-        <div className="p-4 border-b flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar aluno..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 rounded-lg"
-            />
-          </div>
-          <Select value={gradeFilter} onValueChange={setGradeFilter}>
-            <SelectTrigger className="w-full sm:w-36 rounded-lg">
-              <SelectValue placeholder="Série" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {grades.map((g) => (
-                <SelectItem key={g} value={g}>{g}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={shiftFilter} onValueChange={setShiftFilter}>
-            <SelectTrigger className="w-full sm:w-36 rounded-lg">
-              <SelectValue placeholder="Turno" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {shifts.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
+      <Card className="shadow-sm rounded-xl overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -146,14 +243,60 @@ export default function Students() {
         ) : (
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead className="w-12"></TableHead>
-                <TableHead>Nome</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Série</TableHead>
-                <TableHead>Turno</TableHead>
+              <TableRow className="bg-muted/30">
+                <TableHead>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Nome..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="h-8 pl-7 text-xs rounded-md"
+                    />
+                  </div>
+                </TableHead>
+                <TableHead>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="h-8 text-xs rounded-md">
+                      <SelectValue placeholder="Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="Ativo">Ativo</SelectItem>
+                      <SelectItem value="Inativo">Inativo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </TableHead>
+                <TableHead>
+                  <Select value={gradeFilter} onValueChange={setGradeFilter}>
+                    <SelectTrigger className="h-8 text-xs rounded-md">
+                      <SelectValue placeholder="Série" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      {grades.map((g) => (
+                        <SelectItem key={g} value={g}>{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableHead>
+                <TableHead>
+                  <Select value={shiftFilter} onValueChange={setShiftFilter}>
+                    <SelectTrigger className="h-8 text-xs rounded-md">
+                      <SelectValue placeholder="Turno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      {shifts.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </TableHead>
                 <TableHead className="hidden md:table-cell">Responsável</TableHead>
-                <TableHead className="hidden md:table-cell">Telefone</TableHead>
+                <TableHead className="hidden lg:table-cell">Telefone 1</TableHead>
+                <TableHead className="hidden lg:table-cell">Telefone 2</TableHead>
+                <TableHead className="hidden xl:table-cell">Telefone 3</TableHead>
                 <TableHead className="w-10"></TableHead>
               </TableRow>
             </TableHeader>
@@ -164,26 +307,19 @@ export default function Students() {
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => navigate(`/alunos/${student.id}`)}
                 >
-                  <TableCell>
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
-                        {getInitials(student.nome)}
-                      </AvatarFallback>
-                    </Avatar>
-                  </TableCell>
                   <TableCell className="font-semibold text-foreground">
                     {student.nome}
                   </TableCell>
                   <TableCell>
                     <Badge
-                      variant={student.situacao === "Ativo" ? "default" : "secondary"}
+                      variant={(student.status || student.situacao) === "Ativo" ? "default" : "secondary"}
                       className={
-                        student.situacao === "Ativo"
+                        (student.status || student.situacao) === "Ativo"
                           ? "bg-success/10 text-success border-success/20 hover:bg-success/20"
                           : "bg-muted text-muted-foreground"
                       }
                     >
-                      {student.situacao}
+                      {student.status || student.situacao}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{student.serie}</TableCell>
@@ -191,8 +327,14 @@ export default function Students() {
                   <TableCell className="hidden md:table-cell text-muted-foreground">
                     {student.responsavelfinanceiro || student.nomedamae || "—"}
                   </TableCell>
-                  <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {student.telefone1}
+                  <TableCell className="hidden lg:table-cell text-muted-foreground">
+                    {student.telefone1 || "—"}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell text-muted-foreground">
+                    {student.telefone2 || "—"}
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell text-muted-foreground">
+                    {student.telefone3 || "—"}
                   </TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
@@ -225,7 +367,7 @@ export default function Students() {
               ))}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     Nenhum aluno encontrado.
                   </TableCell>
                 </TableRow>
@@ -234,6 +376,32 @@ export default function Students() {
           </Table>
         )}
       </Card>
+
+      <Dialog open={serieDialogOpen} onOpenChange={setSerieDialogOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Selecionar Série</DialogTitle>
+          </DialogHeader>
+          <Select value={selectedSerie} onValueChange={setSelectedSerie}>
+            <SelectTrigger className="rounded-lg">
+              <SelectValue placeholder="Escolha a série" />
+            </SelectTrigger>
+            <SelectContent>
+              {grades.map((g) => (
+                <SelectItem key={g} value={g}>{g}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSerieDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSerieConfirm}>
+              Gerar PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <StudentForm
         open={formOpen}
