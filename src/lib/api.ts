@@ -138,6 +138,73 @@ export const dashboardApi = {
   },
 };
 
+export interface Produto {
+  id: string;
+  nome: string;
+  categoria: "Fardamento" | "Material Didático" | "Taxa";
+  serie_aplicavel: string | null;
+  preco: number;
+  status: "Ativo" | "Inativo";
+}
+
+export interface ReciboItem {
+  nome: string;
+  preco: number;
+  quantidade: number;
+}
+
+export interface Recibo {
+  id: string;
+  aluno_id: string;
+  data_emissao: string;
+  itens: ReciboItem[];
+  valor_total: number;
+}
+
+export const produtosApi = {
+  list: async () => {
+    const { data, error } = await supabase.from("produtos").select("*").order("nome");
+    if (error) throw error;
+    return (data || []) as Produto[];
+  },
+
+  create: async (produto: Omit<Produto, "id">) => {
+    const { data, error } = await supabase.from("produtos").insert(produto).select().single();
+    if (error) throw error;
+    return data as Produto;
+  },
+
+  update: async (id: string, data: Partial<Produto>) => {
+    const { data: updated, error } = await supabase.from("produtos").update(data).eq("id", id).select().single();
+    if (error) throw error;
+    return updated as Produto;
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase.from("produtos").delete().eq("id", id);
+    if (error) throw error;
+  },
+};
+
+export const recibosApi = {
+  create: async (recibo: { aluno_id: string; itens: ReciboItem[]; valor_total: number }) => {
+    const payload = {
+      aluno_id: recibo.aluno_id,
+      itens: recibo.itens,
+      valor_total: recibo.valor_total,
+    };
+    const { data, error } = await supabase.from("recibos").insert(payload).select().single();
+    if (error) throw error;
+    return data as Recibo;
+  },
+
+  list: async () => {
+    const { data, error } = await supabase.from("recibos").select("*").order("data_emissao", { ascending: false });
+    if (error) throw error;
+    return (data || []) as Recibo[];
+  },
+};
+
 export const documentosApi = {
   listTemplates: async () => {
     return [

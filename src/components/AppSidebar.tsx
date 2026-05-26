@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, FileText, Sparkles, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, FileText, Sparkles, LogOut, Package, Receipt } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -21,6 +21,11 @@ const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Alunos", url: "/alunos", icon: Users },
   { title: "Documentos", url: "/documentos", icon: FileText },
+];
+
+const financeiroItems = [
+  { title: "Produtos", url: "/financeiro/produtos", icon: Package },
+  { title: "Recibos", url: "/financeiro/recibos", icon: Receipt },
 ];
 
 export function AppSidebar() {
@@ -73,6 +78,49 @@ export function AppSidebar() {
                       <NavLink
                         to={item.url}
                         end={item.url === "/"}
+                        className={`
+                          group relative hover:bg-sidebar-accent/80 transition-all duration-200 rounded-lg
+                          ${collapsed ? "w-full flex items-center justify-center px-2" : ""}
+                        `}
+                        activeClassName="bg-sidebar-accent text-sidebar-primary-foreground font-medium shadow-md"
+                      >
+                        <item.icon 
+                          className={`h-4 w-4 transition-transform group-hover:scale-110 ${collapsed ? "mx-auto" : ""}`} 
+                        />
+                        {!collapsed && <span>{item.title}</span>}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          {!collapsed && (
+            <SidebarGroupContent>
+              <div className="px-6 py-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+                  Financeiro
+                </p>
+              </div>
+            </SidebarGroupContent>
+          )}
+          <SidebarGroupContent>
+            <SidebarMenu className={collapsed ? "space-y-2" : "space-y-1 px-3"}>
+              {financeiroItems.map((item) => {
+                const isActive = location.pathname.startsWith(item.url);
+                
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive}
+                      tooltip={collapsed ? item.title : undefined}
+                    >
+                      <NavLink
+                        to={item.url}
                         className={`
                           group relative hover:bg-sidebar-accent/80 transition-all duration-200 rounded-lg
                           ${collapsed ? "w-full flex items-center justify-center px-2" : ""}
