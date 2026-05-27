@@ -19,13 +19,40 @@ const breadcrumbMap: Record<string, string> = {
   "/": "Dashboard",
   "/alunos": "Alunos",
   "/documentos": "Documentos",
+  "/financeiro/vendas": "Vendas",
+  "/financeiro/produtos": "Produtos",
 };
+
+function getBreadcrumbs(pathname: string): { label: string; path?: string }[] {
+  const crumbs: { label: string; path?: string }[] = [{ label: "Início", path: "/" }];
+
+  if (pathname === "/") {
+    crumbs.push({ label: "Dashboard" });
+    return crumbs;
+  }
+
+  const alunoMatch = pathname.match(/^\/alunos\/(.+)$/);
+  if (alunoMatch) {
+    crumbs.push({ label: "Alunos", path: "/alunos" });
+    crumbs.push({ label: "Perfil do Aluno" });
+    return crumbs;
+  }
+
+  const staticLabel = breadcrumbMap[pathname];
+  if (staticLabel) {
+    crumbs.push({ label: staticLabel });
+  } else {
+    crumbs.push({ label: "Página" });
+  }
+
+  return crumbs;
+}
 
 export function AppHeader() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const currentPage = breadcrumbMap[location.pathname] || "Página";
+  const breadcrumbs = getBreadcrumbs(location.pathname);
 
   const userName = user?.email?.split("@")[0] || "Admin";
   const userEmail = user?.email || "";
@@ -42,22 +69,26 @@ export function AppHeader() {
         <SidebarTrigger className="hover:bg-accent" />
         <Separator orientation="vertical" className="h-6" />
         <nav className="flex items-center gap-2 text-sm">
-          {currentPage !== "Dashboard" ? (
-            <Link
-              to="/"
-              className="text-muted-foreground font-medium hover:text-foreground transition-colors"
-            >
-              Início
-            </Link>
-          ) : (
-            <span className="text-muted-foreground font-medium">Início</span>
-          )}
-          {currentPage !== "Dashboard" && (
-            <>
-              <span className="text-muted-foreground/40">/</span>
-              <span className="font-semibold text-foreground">{currentPage}</span>
-            </>
-          )}
+          {breadcrumbs.map((crumb, idx) => {
+            const isLast = idx === breadcrumbs.length - 1;
+            return (
+              <span key={idx} className="flex items-center gap-2">
+                {idx > 0 && <span className="text-muted-foreground/40">/</span>}
+                {crumb.path && !isLast ? (
+                  <Link
+                    to={crumb.path}
+                    className="text-muted-foreground font-medium hover:text-foreground transition-colors"
+                  >
+                    {crumb.label}
+                  </Link>
+                ) : (
+                  <span className={isLast ? "font-semibold text-foreground" : "text-muted-foreground font-medium"}>
+                    {crumb.label}
+                  </span>
+                )}
+              </span>
+            );
+          })}
         </nav>
       </div>
 

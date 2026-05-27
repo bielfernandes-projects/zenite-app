@@ -11,7 +11,7 @@ import Students from "./pages/Students";
 import Documents from "./pages/Documents";
 import StudentProfile from "./pages/StudentProfile";
 import Products from "./pages/Products";
-import Recibos from "./pages/Recibos";
+import Sales from "./pages/Sales";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 
@@ -32,7 +32,7 @@ function AppRoutes() {
                 <Route path="/alunos/:id" element={<StudentProfile />} />
                 <Route path="/documentos" element={<Documents />} />
                 <Route path="/financeiro/produtos" element={<Products />} />
-                <Route path="/financeiro/recibos" element={<Recibos />} />
+                <Route path="/financeiro/vendas" element={<Sales />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </AppLayout>

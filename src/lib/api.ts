@@ -161,6 +161,14 @@ export interface Recibo {
   valor_total: number;
 }
 
+export interface VendaItem {
+  id_produto: string;
+  nome: string;
+  preco_unitario: number;
+  quantidade: number;
+  subtotal: number;
+}
+
 export const produtosApi = {
   list: async () => {
     const { data, error } = await supabase.from("produtos").select("*").order("nome");
@@ -187,7 +195,7 @@ export const produtosApi = {
 };
 
 export const recibosApi = {
-  create: async (recibo: { aluno_id: string; itens: ReciboItem[]; valor_total: number }) => {
+  create: async (recibo: { aluno_id: string; itens: (ReciboItem | VendaItem)[]; valor_total: number }) => {
     const payload = {
       aluno_id: recibo.aluno_id,
       itens: recibo.itens,

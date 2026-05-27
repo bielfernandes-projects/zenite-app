@@ -1,11 +1,8 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FileDown, Loader2, Search, User, ShoppingCart, Check } from "lucide-react";
+import { FileDown, Loader2, Search, User, ShoppingCart } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Command,
@@ -31,30 +28,37 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { alunosApi, produtosApi, recibosApi, Aluno, Produto, ReciboItem } from "@/lib/api";
+import { alunosApi, produtosApi, recibosApi, Aluno, Produto, VendaItem } from "@/lib/api";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
-interface SelectedItem extends ReciboItem {
-  produtoId: string;
+interface Quantities {
+  [produtoId: string]: number;
 }
 
-export default function Recibos() {
+export default function Sales() {
   const [selectedStudent, setSelectedStudent] = useState<Aluno | null>(null);
   const [comboOpen, setComboOpen] = useState(false);
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [quantities, setQuantities] = useState<Quantities>({});
   const [loading, setLoading] = useState(false);
 
   const { data: alunosData } = useQuery({
-    queryKey: ["alunos", "recibos"],
+    queryKey: ["alunos", "sales"],
     queryFn: () => alunosApi.list({ limit: 500 }),
   });
 
   const { data: produtos = [] } = useQuery({
-    queryKey: ["produtos", "recibos"],
+    queryKey: ["produtos", "sales"],
     queryFn: () => produtosApi.list(),
   });
+
+  useEffect(() => {
+    const initialQuantities: Quantities = {};
+    produtos.forEach((p) => {
+      initialQuantities[p.id] = 0;
+    });
+    setQuantities(initialQuantities);
+  }, [produtos]);
 
   const alunosAtivos = (alunosData?.items || []).filter((s) => s.situacao === "Ativo");
 
@@ -62,59 +66,58 @@ export default function Recibos() {
     let list = produtos.filter((p) => p.status === "Ativo");
     if (selectedStudent?.serie) {
       list = list.filter(
-        (p) => !p.serie_aplicavel || p.serie_aplicavel === selectedStudent.serie
+        (p) =>
+          !p.serie_aplicavel ||
+          p.serie_aplicavel === "" ||
+          p.serie_aplicavel.toLowerCase() === "nenhuma" ||
+          p.serie_aplicavel === selectedStudent.serie
       );
     }
     return list;
   }, [produtos, selectedStudent]);
 
-  const toggleProduto = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
+  const setQuantidade = useCallback((id: string, qtd: number) => {
+    setQuantities((prev) => ({
+      ...prev,
+      [id]: Math.max(0, qtd),
+    }));
+  }, []);
 
-  const setQuantidade = (id: string, qtd: number) => {
-    setQuantities((prev) => ({ ...prev, [id]: Math.max(1, qtd) }));
-  };
-
-  const selectedItems = useMemo((): SelectedItem[] => {
-    return Array.from(selectedIds)
-      .map((id) => {
-        const p = produtos.find((pr) => pr.id === id);
-        if (!p) return null;
+  const itensComprados = useMemo((): VendaItem[] => {
+    return produtosVisiveis
+      .filter((p) => quantities[p.id] > 0)
+      .map((p) => {
+        const subtotal = Number((p.preco * quantities[p.id]).toFixed(2));
         return {
-          produtoId: p.id,
+          id_produto: p.id,
           nome: p.nome,
-          preco: p.preco,
-          quantidade: quantities[id] || 1,
+          preco_unitario: p.preco,
+          quantidade: quantities[p.id],
+          subtotal,
         };
-      })
-      .filter((item): item is SelectedItem => item !== null);
-  }, [selectedIds, produtos, quantities]);
+      });
+  }, [produtosVisiveis, quantities]);
 
   const total = useMemo(() => {
-    return selectedItems.reduce((acc, item) => {
-      return acc + item.preco * item.quantidade;
+    const soma = itensComprados.reduce((acc, item) => {
+      return acc + item.subtotal;
     }, 0);
-  }, [selectedItems]);
+    return Number(soma.toFixed(2));
+  }, [itensComprados]);
 
   const formatBRL = (value: number) =>
     value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  const resetForm = () => {
-    setSelectedIds(new Set());
-    setQuantities({});
-  };
+  const resetForm = useCallback(() => {
+    const reset: Quantities = {};
+    produtos.forEach((p) => {
+      reset[p.id] = 0;
+    });
+    setQuantities(reset);
+  }, [produtos]);
 
   const generatePDF = useCallback(
-    async (aluno: Aluno, itens: SelectedItem[], valorTotal: number) => {
+    async (aluno: Aluno, itens: VendaItem[], valorTotal: number) => {
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       const margin = 20;
@@ -122,7 +125,7 @@ export default function Recibos() {
 
       doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
-      doc.text("Zênite - Sistema de Gestão Escolar", pageWidth / 2, y, { align: "center" });
+      doc.text("ESCOLA ZÊNITE", pageWidth / 2, y, { align: "center" });
       y += 6;
 
       doc.setFontSize(10);
@@ -130,28 +133,43 @@ export default function Recibos() {
       doc.text("Ensino Fundamental - 6º ao 9º Ano", pageWidth / 2, y, { align: "center" });
       y += 6;
       doc.text(`CNPJ: 00.000.000/0001-00`, pageWidth / 2, y, { align: "center" });
-      y += 12;
+      y += 14;
 
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
       doc.text("RECIBO DE PAGAMENTO", pageWidth / 2, y, { align: "center" });
-      y += 12;
+      y += 10;
 
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      doc.text(`Aluno: ${aluno.nome}`, margin, y);
-      y += 6;
-      doc.text(`Série: ${aluno.serie} - Turno: ${aluno.turno}`, margin, y);
-      y += 6;
-      doc.text(`Responsável Financeiro: ${aluno.responsavelfinanceiro || "—"}`, margin, y);
-      y += 10;
+      const dataEmissao = new Date().toLocaleDateString("pt-BR");
+      const horaEmissao = new Date().toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      doc.text(`Data da Emissão: ${dataEmissao} às ${horaEmissao}`, pageWidth - margin, y, {
+        align: "right",
+      });
+      y += 12;
 
-      const tableColumn = ["Item", "Quantidade", "Valor Unitário", "Subtotal"];
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("DADOS DO ALUNO", margin, y);
+      y += 8;
+      doc.setFont("helvetica", "normal");
+      doc.text(`Nome: ${aluno.nome}`, margin, y);
+      y += 6;
+      doc.text(`Série: ${aluno.serie}`, margin, y);
+      y += 6;
+      doc.text(`Turno: ${aluno.turno}`, margin, y);
+      y += 12;
+
+      const tableColumn = ["Qtd", "Descrição", "Vlr Unitário", "Subtotal"];
       const tableRows = itens.map((item) => [
-        item.nome,
         String(item.quantidade),
-        formatBRL(item.preco),
-        formatBRL(item.preco * item.quantidade),
+        item.nome,
+        formatBRL(item.preco_unitario),
+        formatBRL(item.subtotal),
       ]);
 
       doc.autoTable({
@@ -159,70 +177,76 @@ export default function Recibos() {
         body: tableRows,
         startY: y,
         margin: { horizontal: margin },
-        styles: { fontSize: 9, cellPadding: 3 },
+        styles: { fontSize: 9, cellPadding: 4 },
         headStyles: { fillColor: [21, 43, 33], textColor: 255, fontStyle: "bold" },
         alternateRowStyles: { fillColor: [240, 245, 242] },
+        columnStyles: {
+          0: { cellWidth: 25, halign: "center" },
+          2: { cellWidth: 40, halign: "right" },
+          3: { cellWidth: 40, halign: "right" },
+        },
       });
 
       const docWithTable = doc as jsPDF & { lastAutoTable: { finalY: number } };
-      const finalY = docWithTable.lastAutoTable.finalY + 8;
+      const finalY = docWithTable.lastAutoTable.finalY + 12;
 
-      doc.setFontSize(11);
+      doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
-      doc.text(`Total: ${formatBRL(valorTotal)}`, pageWidth - margin, finalY, { align: "right" });
-      doc.setDrawColor(21, 43, 33);
-      doc.setLineWidth(0.5);
-      doc.line(margin, finalY + 3, pageWidth - margin, finalY + 3);
+      doc.text(`Total Pago: ${formatBRL(valorTotal)}`, pageWidth - margin, finalY, {
+        align: "right",
+      });
+      y = finalY + 20;
 
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
       doc.setTextColor(100);
-      doc.text(
-        `Emitido em: ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`,
-        margin,
-        finalY + 12
-      );
+      const linhaY = pageWidth - 40;
+      doc.line(margin + 30, y, linhaY, y);
+      y += 8;
+      doc.text("Assinatura da Secretaria", pageWidth / 2, y, { align: "center" });
 
       return doc.output("blob");
     },
     []
   );
 
-  const handleGenerate = async () => {
+  const handleFinalizarVenda = async () => {
     if (!selectedStudent) {
       toast.error("Selecione um aluno.");
       return;
     }
-    if (selectedItems.length === 0) {
-      toast.error("Selecione ao menos um produto.");
+    if (itensComprados.length === 0 || total <= 0) {
+      toast.error("Carrinho vazio. Adicione produtos para finalizar a venda.");
       return;
     }
+
     setLoading(true);
 
     try {
-      const valorTotal = Math.round(total * 100) / 100;
-      const itensSnapshot: ReciboItem[] = selectedItems.map(({ produtoId: _id, ...rest }) => rest);
-
       await recibosApi.create({
         aluno_id: selectedStudent.id,
-        itens: itensSnapshot,
-        valor_total: valorTotal,
+        itens: itensComprados,
+        valor_total: total,
       });
 
-      const blob = await generatePDF(selectedStudent, selectedItems, valorTotal);
+      const blob = await generatePDF(selectedStudent, itensComprados, total);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `recibo_${selectedStudent.nome.replace(/\s+/g, "_")}.pdf`;
+
+      const dataStr = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const nomeArquivo = `Recibo_${selectedStudent.nome.replace(/\s+/g, "_")}_${dataStr}.pdf`;
+      a.download = nomeArquivo;
+
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("Recibo gerado com sucesso!");
+      toast.success("Venda finalizada! Recibo gerado com sucesso.");
       resetForm();
     } catch {
-      toast.error("Erro ao gerar recibo. Tente novamente.");
+      toast.error("Erro ao finalizar venda. Tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -239,7 +263,7 @@ export default function Recibos() {
 
   return (
     <div className="space-y-6">
-      <h2 className="text-2xl font-semibold text-foreground">Emissão de Recibos</h2>
+      <h2 className="text-2xl font-semibold text-foreground">Vendas</h2>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
@@ -275,8 +299,7 @@ export default function Recibos() {
                             key={s.id}
                             onSelect={() => {
                               setSelectedStudent(s);
-                              setSelectedIds(new Set());
-                              setQuantities({});
+                              resetForm();
                               setComboOpen(false);
                             }}
                             className="flex items-center justify-between"
@@ -287,9 +310,6 @@ export default function Recibos() {
                                 {s.serie} - {s.turno}
                               </span>
                             </div>
-                            {selectedStudent?.id === s.id && (
-                              <Check className="h-4 w-4 text-emerald-600" />
-                            )}
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -325,75 +345,69 @@ export default function Recibos() {
                   Selecione um aluno para ver os produtos disponíveis.
                 </div>
               ) : (
-                <ScrollArea className="h-[320px] pr-4">
-                  <div className="space-y-1">
-                    {produtosVisiveis.map((produto) => (
-                      <div
-                        key={produto.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
-                          selectedIds.has(produto.id)
-                            ? "border-emerald-300 bg-emerald-50/50"
-                            : "border-transparent hover:bg-muted/30"
-                        }`}
-                        onClick={() => toggleProduto(produto.id)}
-                      >
-                        <Checkbox
-                          checked={selectedIds.has(produto.id)}
-                          onCheckedChange={() => toggleProduto(produto.id)}
-                          className="data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm text-foreground truncate">
-                              {produto.nome}
+                <ScrollArea className="h-[380px] pr-4">
+                  <div className="space-y-2">
+                    {produtosVisiveis.map((produto) => {
+                      const qtd = quantities[produto.id] || 0;
+                      const temNoCarrinho = qtd > 0;
+
+                      return (
+                        <div
+                          key={produto.id}
+                          className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                            temNoCarrinho
+                              ? "border-emerald-300 bg-emerald-50/50"
+                              : "border-transparent hover:bg-muted/30"
+                          }`}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-sm text-foreground truncate">
+                                {produto.nome}
+                              </span>
+                              <Badge
+                                variant="outline"
+                                className={`text-[10px] px-1.5 py-0 ${getCategoriaColor(
+                                  produto.categoria
+                                )}`}
+                              >
+                                {produto.categoria}
+                              </Badge>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {produto.serie_aplicavel
+                                ? `Série: ${produto.serie_aplicavel}`
+                                : "Todas as séries"}
                             </span>
-                            <Badge
-                              variant="outline"
-                              className={`text-[10px] px-1.5 py-0 ${getCategoriaColor(produto.categoria)}`}
-                            >
-                              {produto.categoria}
-                            </Badge>
                           </div>
-                          <span className="text-xs text-muted-foreground">
-                            {produto.serie_aplicavel
-                              ? `Série: ${produto.serie_aplicavel}`
-                              : "Todas as séries"}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <span className="font-semibold text-sm text-foreground">
-                            {formatBRL(produto.preco)}
-                          </span>
-                        </div>
-                        {selectedIds.has(produto.id) && (
-                          <div className="flex items-center gap-1 ml-2">
+
+                          <div className="text-right mr-2">
+                            <span className="font-semibold text-sm text-foreground">
+                              {formatBRL(produto.preco)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1">
                             <button
                               type="button"
-                              className="w-7 h-7 rounded-md border border-input text-xs font-medium hover:bg-muted transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setQuantidade(produto.id, (quantities[produto.id] || 1) - 1);
-                              }}
+                              className="w-8 h-8 rounded-md border border-input text-sm font-medium hover:bg-muted transition-colors disabled:opacity-40"
+                              onClick={() => setQuantidade(produto.id, qtd - 1)}
+                              disabled={qtd === 0}
                             >
                               −
                             </button>
-                            <span className="w-6 text-center text-sm font-medium">
-                              {quantities[produto.id] || 1}
-                            </span>
+                            <span className="w-8 text-center text-sm font-medium">{qtd}</span>
                             <button
                               type="button"
-                              className="w-7 h-7 rounded-md border border-input text-xs font-medium hover:bg-muted transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setQuantidade(produto.id, (quantities[produto.id] || 1) + 1);
-                              }}
+                              className="w-8 h-8 rounded-md border border-input text-sm font-medium hover:bg-muted transition-colors"
+                              onClick={() => setQuantidade(produto.id, qtd + 1)}
                             >
                               +
                             </button>
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      );
+                    })}
                     {produtosVisiveis.length === 0 && (
                       <div className="text-center py-8 text-muted-foreground text-sm">
                         Nenhum produto disponível para esta série.
@@ -414,10 +428,10 @@ export default function Recibos() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {selectedItems.length === 0 ? (
+              {itensComprados.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-32 text-muted-foreground text-sm">
                   <ShoppingCart className="h-8 w-8 mb-2 text-muted-foreground/40" />
-                  Nenhum item selecionado
+                  Carrinho vazio
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -430,14 +444,14 @@ export default function Recibos() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedItems.map((item) => (
-                        <TableRow key={item.produtoId}>
+                      {itensComprados.map((item) => (
+                        <TableRow key={item.id_produto}>
                           <TableCell className="text-sm py-2">{item.nome}</TableCell>
                           <TableCell className="text-sm text-right py-2">
                             {item.quantidade}
                           </TableCell>
                           <TableCell className="text-sm text-right font-medium py-2">
-                            {formatBRL(item.preco * item.quantidade)}
+                            {formatBRL(item.subtotal)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -449,7 +463,7 @@ export default function Recibos() {
               <Separator className="my-4" />
 
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total</span>
+                <span className="text-sm text-muted-foreground">Total da Compra</span>
                 <span className="text-xl font-bold text-emerald-700">
                   {formatBRL(total)}
                 </span>
@@ -458,15 +472,15 @@ export default function Recibos() {
               <Button
                 className="w-full mt-6"
                 size="lg"
-                onClick={handleGenerate}
-                disabled={loading || selectedItems.length === 0 || !selectedStudent}
+                onClick={handleFinalizarVenda}
+                disabled={loading || total <= 0 || !selectedStudent}
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : (
                   <FileDown className="h-4 w-4 mr-2" />
                 )}
-                Gerar Recibo
+                Finalizar Venda / Gerar Recibo
               </Button>
             </CardContent>
           </Card>

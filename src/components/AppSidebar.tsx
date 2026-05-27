@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, FileText, Sparkles, LogOut, Package, Receipt } from "lucide-react";
+import { LayoutDashboard, Users, FileText, Sparkles, LogOut, Package, ShoppingCart } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,8 +24,8 @@ const items = [
 ];
 
 const financeiroItems = [
+  { title: "Vendas", url: "/financeiro/vendas", icon: ShoppingCart },
   { title: "Produtos", url: "/financeiro/produtos", icon: Package },
-  { title: "Recibos", url: "/financeiro/recibos", icon: Receipt },
 ];
 
 export function AppSidebar() {
