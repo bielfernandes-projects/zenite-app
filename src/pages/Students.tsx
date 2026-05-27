@@ -36,7 +36,7 @@ import {
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
 import { StudentForm } from "@/components/StudentForm";
-import { alunosApi, Aluno } from "@/lib/api";
+import { alunosApi, Aluno, AlunoComMatriculas, getMatriculaAtiva } from "@/lib/api";
 import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
 applyPlugin(jsPDF);
@@ -59,10 +59,10 @@ export default function Students() {
   const [selectedSerie, setSelectedSerie] = useState("");
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["alunos", search, gradeFilter],
+    queryKey: ["alunos", search],
     queryFn: () => alunosApi.list({ 
       search: search || undefined,
-      serie: gradeFilter !== "all" ? gradeFilter : undefined
+      withMatriculas: true,
     }),
   });
 
@@ -77,10 +77,14 @@ export default function Students() {
     },
   });
 
-  const filtered = (data?.items || []).filter((s) => {
-    const matchShift = shiftFilter === "all" || s.turno === shiftFilter;
+  const alunos = (data?.items || []) as AlunoComMatriculas[];
+
+  const filtered = alunos.filter((s) => {
+    const matriculaAtiva = getMatriculaAtiva(s);
+    const matchShift = shiftFilter === "all" || (matriculaAtiva?.turno || s.turno) === shiftFilter;
     const matchStatus = statusFilter === "all" || (s.status || s.situacao) === statusFilter;
-    return matchShift && matchStatus;
+    const matchGrade = gradeFilter === "all" || (matriculaAtiva?.serie || s.serie) === gradeFilter;
+    return matchShift && matchStatus && matchGrade;
   });
 
   const handleSave = () => {
@@ -112,14 +116,17 @@ export default function Students() {
       doc.text(`Emitido em: ${new Date().toLocaleDateString("pt-BR")}`, pageWidth - margin, margin + 16, { align: "right" });
 
       const tableColumn = ["Nome", "Série", "Turno", "Responsável", "Telefone 1", "Telefone 2"];
-      const tableRows = students.map((s) => [
-        s.nome,
-        s.serie || "—",
-        s.turno || "—",
-        s.responsavelfinanceiro || s.nomedamae || "—",
-        s.telefone1 || "—",
-        s.telefone2 || "—",
-      ]);
+      const tableRows = students.map((s) => {
+        const mat = getMatriculaAtiva(s);
+        return [
+          s.nome,
+          mat?.serie || s.serie || "—",
+          mat?.turno || s.turno || "—",
+          s.responsavelfinanceiro || s.nomedamae || "—",
+          s.telefone1 || "—",
+          s.telefone2 || "—",
+        ];
+      });
 
       doc.autoTable({
         head: [tableColumn],
@@ -173,7 +180,10 @@ export default function Students() {
       toast.error("Selecione uma série.");
       return;
     }
-    const filteredBySerie = filtered.filter((s) => s.serie === selectedSerie);
+    const filteredBySerie = filtered.filter((s) => {
+      const mat = getMatriculaAtiva(s);
+      return (mat?.serie || s.serie) === selectedSerie;
+    });
     if (filteredBySerie.length === 0) {
       toast.error("Nenhum aluno encontrado para esta série.");
       return;
@@ -301,7 +311,9 @@ export default function Students() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((student) => (
+              {filtered.map((student) => {
+                const matriculaAtiva = getMatriculaAtiva(student);
+                return (
                 <TableRow 
                   key={student.id} 
                   className="cursor-pointer hover:bg-muted/50"
@@ -322,8 +334,8 @@ export default function Students() {
                       {student.status || student.situacao}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{student.serie}</TableCell>
-                  <TableCell className="text-muted-foreground">{student.turno}</TableCell>
+                  <TableCell className="text-muted-foreground">{matriculaAtiva?.serie || "Sem matrícula"}</TableCell>
+                  <TableCell className="text-muted-foreground">{matriculaAtiva?.turno || "—"}</TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
                     {student.responsavelfinanceiro || student.nomedamae || "—"}
                   </TableCell>
@@ -364,7 +376,8 @@ export default function Students() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))}
+              );
+              })}
               {filtered.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">

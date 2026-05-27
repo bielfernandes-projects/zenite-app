@@ -1,25 +1,80 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Edit, Trash2, MapPin, Calendar, User, Contact, Loader2, GraduationCap, Phone } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, MapPin, Calendar, User, Contact, Loader2, GraduationCap, Phone, Plus, BookOpen } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { alunosApi } from "@/lib/api";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { alunosApi, matriculasApi, AlunoComMatriculas, Matricula } from "@/lib/api";
 import { toast } from "sonner";
 import { StudentForm } from "@/components/StudentForm";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+const grades = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano", "6º Ano", "7º Ano", "8º Ano", "9º Ano"];
+const shifts = ["Manhã", "Tarde", "Integral"];
+const matriculaStatuses = ["Ativo", "Concluído", "Transferido", "Cancelado"];
+
+const matriculaSchema = z.object({
+  ano_letivo: z.coerce.number().min(2020, "Ano letivo inválido").max(2030),
+  serie: z.string().min(1, "Selecione a série"),
+  turno: z.string().min(1, "Selecione o turno"),
+  status: z.string().min(1, "Selecione o status"),
+});
+
+type MatriculaFormData = z.infer<typeof matriculaSchema>;
 
 export default function StudentProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
+  const [matriculaDialogOpen, setMatriculaDialogOpen] = useState(false);
+  const [tabValue, setTabValue] = useState("personal");
 
   const { data: student, isLoading, error } = useQuery({
     queryKey: ["aluno", id],
     queryFn: () => alunosApi.get(id!),
+    enabled: !!id,
+  });
+
+  const { data: matriculas = [], isLoading: matriculasLoading } = useQuery({
+    queryKey: ["matriculas", id],
+    queryFn: () => matriculasApi.list(id!),
     enabled: !!id,
   });
 
@@ -34,6 +89,45 @@ export default function StudentProfile() {
       toast.error("Erro ao excluir aluno");
     },
   });
+
+  const matriculaForm = useForm<MatriculaFormData>({
+    resolver: zodResolver(matriculaSchema),
+    defaultValues: {
+      ano_letivo: new Date().getFullYear(),
+      serie: "",
+      turno: "",
+      status: "Ativo",
+    },
+  });
+
+  const createMatriculaMutation = useMutation({
+    mutationFn: (data: MatriculaFormData) =>
+      matriculasApi.create({
+        aluno_id: id!,
+        ...data,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["matriculas", id] });
+      queryClient.invalidateQueries({ queryKey: ["aluno", id] });
+      toast.success("Matrícula cadastrada com sucesso!");
+      setMatriculaDialogOpen(false);
+      matriculaForm.reset();
+    },
+    onError: () => {
+      toast.error("Erro ao cadastrar matrícula. Tente novamente.");
+    },
+  });
+
+  useEffect(() => {
+    if (matriculaDialogOpen) {
+      matriculaForm.reset({
+        ano_letivo: new Date().getFullYear(),
+        serie: "",
+        turno: "",
+        status: "Ativo",
+      });
+    }
+  }, [matriculaDialogOpen, matriculaForm]);
 
   const getInitials = (name: string) =>
     name
@@ -55,6 +149,20 @@ export default function StudentProfile() {
     if (confirm("Tem certeza que deseja excluir este aluno?")) {
       deleteMutation.mutate();
     }
+  };
+
+  const onSubmitMatricula = (data: MatriculaFormData) => {
+    createMatriculaMutation.mutate(data);
+  };
+
+  const getStatusBadgeColor = (status: string) => {
+    const colors: Record<string, string> = {
+      Ativo: "bg-success/10 text-success border-success/20 hover:bg-success/20",
+      Concluído: "bg-blue-100 text-blue-700 border-blue-200",
+      Transferido: "bg-amber-100 text-amber-700 border-amber-200",
+      Cancelado: "bg-destructive/10 text-destructive border-destructive/20",
+    };
+    return colors[status] || "bg-muted text-muted-foreground";
   };
 
   if (isLoading) {
@@ -90,10 +198,10 @@ export default function StudentProfile() {
             <Edit className="h-4 w-4 mr-2" />
             Editar
           </Button>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="text-destructive" 
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
             onClick={handleDelete}
             disabled={deleteMutation.isPending}
           >
@@ -146,128 +254,303 @@ export default function StudentProfile() {
         </CardContent>
       </Card>
 
-      {/* Info Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Dados Pessoais */}
-        <Card className="border-none shadow-sm">
-          <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Dados Pessoais
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-3">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground text-sm">Mensalidade</span>
-              <span className="font-medium">{formatCurrency(student.valormensalidade)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground text-sm">Vencimento</span>
-              <span className="font-medium">Dia {student.datadovencimento || 10}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between">
-              <span className="text-muted-foreground text-sm">Naturalidade</span>
-              <span className="font-medium">{student.naturalidade || "—"}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground text-sm">Cidade/UF</span>
-              <span className="font-medium">{student.cidade ? `${student.cidade}/${student.estado}` : "—"}</span>
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs value={tabValue} onValueChange={setTabValue} className="w-full">
+        <TabsList className="mb-6">
+          <TabsTrigger value="personal" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Dados Pessoais
+          </TabsTrigger>
+          <TabsTrigger value="history" className="flex items-center gap-2">
+            <BookOpen className="h-4 w-4" />
+            Histórico Escolar
+          </TabsTrigger>
+        </TabsList>
 
-        {/* Filiação */}
-        <Card className="border-none shadow-sm">
-          <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Contact className="h-4 w-4" />
-              Filiação
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-3">
-            <div>
-              <p className="text-muted-foreground text-sm">Mãe</p>
-              <p className="font-medium">{student.nomedamae || "—"}</p>
-              {student.cpfmae && <p className="text-sm text-muted-foreground">CPF: {student.cpfmae}</p>}
-            </div>
-            <Separator />
-            <div>
-              <p className="text-muted-foreground text-sm">Pai</p>
-              <p className="font-medium">{student.nomedopai || "—"}</p>
-              {student.cpfdopai && <p className="text-sm text-muted-foreground">CPF: {student.cpfdopai}</p>}
-            </div>
-            <Separator />
-            <div>
-              <p className="text-muted-foreground text-sm">Resp. Financeiro</p>
-              <p className="font-medium">{student.responsavelfinanceiro || "—"}</p>
-              {student.cpfrespfin && <p className="text-sm text-muted-foreground">CPF: {student.cpfrespfin}</p>}
-            </div>
-            {student.possuiirmao && student.nomeirmao && (
-              <>
+        <TabsContent value="personal" className="space-y-6">
+          {/* Info Cards Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Dados Pessoais */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Dados Pessoais
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Mensalidade</span>
+                  <span className="font-medium">{formatCurrency(student.valormensalidade)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Vencimento</span>
+                  <span className="font-medium">Dia {student.datadovencimento || 10}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Naturalidade</span>
+                  <span className="font-medium">{student.naturalidade || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Cidade/UF</span>
+                  <span className="font-medium">{student.cidade ? `${student.cidade}/${student.estado}` : "—"}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Filiação */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Contact className="h-4 w-4" />
+                  Filiação
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-3">
+                <div>
+                  <p className="text-muted-foreground text-sm">Mãe</p>
+                  <p className="font-medium">{student.nomedamae || "—"}</p>
+                  {student.cpfmae && <p className="text-sm text-muted-foreground">CPF: {student.cpfmae}</p>}
+                </div>
                 <Separator />
                 <div>
-                  <p className="text-muted-foreground text-sm">Irmão na escola</p>
-                  <p className="font-medium">{student.nomeirmao}</p>
+                  <p className="text-muted-foreground text-sm">Pai</p>
+                  <p className="font-medium">{student.nomedopai || "—"}</p>
+                  {student.cpfdopai && <p className="text-sm text-muted-foreground">CPF: {student.cpfdopai}</p>}
                 </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+                <Separator />
+                <div>
+                  <p className="text-muted-foreground text-sm">Resp. Financeiro</p>
+                  <p className="font-medium">{student.responsavelfinanceiro || "—"}</p>
+                  {student.cpfrespfin && <p className="text-sm text-muted-foreground">CPF: {student.cpfrespfin}</p>}
+                </div>
+                {student.possuiirmao && student.nomeirmao && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="text-muted-foreground text-sm">Irmão na escola</p>
+                      <p className="font-medium">{student.nomeirmao}</p>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
 
-        {/* Contato */}
-        <Card className="border-none shadow-sm">
-          <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Phone className="h-4 w-4" />
-              Contato e Endereço
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-3">
-            <div>
-              <p className="text-muted-foreground text-sm">Telefones</p>
-              {student.telefone1 ? (
-                <div className="space-y-1">
-                  <p className="font-medium">{student.telefone1}</p>
-                  <p className="text-xs text-muted-foreground">{student.nometelefone1}</p>
-                  {student.telefone2 && (
-                    <>
-                      <p className="font-medium mt-2">{student.telefone2}</p>
-                      <p className="text-xs text-muted-foreground">{student.nometelefone2}</p>
-                    </>
-                  )}
-                  {student.telefone3 && (
-                    <>
-                      <p className="font-medium mt-2">{student.telefone3}</p>
-                      <p className="text-xs text-muted-foreground">{student.nometelefone3}</p>
-                    </>
+            {/* Contato */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  Contato e Endereço
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-3">
+                <div>
+                  <p className="text-muted-foreground text-sm">Telefones</p>
+                  {student.telefone1 ? (
+                    <div className="space-y-1">
+                      <p className="font-medium">{student.telefone1}</p>
+                      <p className="text-xs text-muted-foreground">{student.nometelefone1}</p>
+                      {student.telefone2 && (
+                        <>
+                          <p className="font-medium mt-2">{student.telefone2}</p>
+                          <p className="text-xs text-muted-foreground">{student.nometelefone2}</p>
+                        </>
+                      )}
+                      {student.telefone3 && (
+                        <>
+                          <p className="font-medium mt-2">{student.telefone3}</p>
+                          <p className="text-xs text-muted-foreground">{student.nometelefone3}</p>
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="font-medium">—</p>
                   )}
                 </div>
+                <Separator />
+                <div>
+                  <p className="text-muted-foreground text-sm">Endereço</p>
+                  {student.logradouro ? (
+                    <p className="font-medium">
+                      {student.logradouro}, {student.numero}
+                      {student.complemento && ` - ${student.complemento}`}
+                    </p>
+                  ) : (
+                    <p className="font-medium">—</p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    {student.bairro} {student.cep && `• ${student.cep}`}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {student.cidadetelefone} {student.estadotelefone && `, ${student.estadotelefone}`}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="history" className="space-y-6">
+          <Card className="border-none shadow-sm">
+            <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20 flex flex-row items-center justify-between">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <GraduationCap className="h-4 w-4" />
+                Matrículas
+              </CardTitle>
+              <Button size="sm" onClick={() => setMatriculaDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                Nova Matrícula
+              </Button>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {matriculasLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : matriculas.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  Nenhuma matrícula cadastrada.
+                </div>
               ) : (
-                <p className="font-medium">—</p>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30">
+                      <TableHead className="text-xs">Ano Letivo</TableHead>
+                      <TableHead className="text-xs">Série</TableHead>
+                      <TableHead className="text-xs">Turno</TableHead>
+                      <TableHead className="text-xs">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {matriculas.map((matricula) => (
+                      <TableRow key={matricula.id}>
+                        <TableCell className="font-medium">{matricula.ano_letivo}</TableCell>
+                        <TableCell>{matricula.serie}</TableCell>
+                        <TableCell>{matricula.turno}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant="outline"
+                            className={getStatusBadgeColor(matricula.status)}
+                          >
+                            {matricula.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Nova Matrícula Dialog */}
+      <Dialog open={matriculaDialogOpen} onOpenChange={setMatriculaDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nova Matrícula</DialogTitle>
+            <DialogDescription>
+              Cadastre uma nova matrícula para {student.nome}.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={matriculaForm.handleSubmit(onSubmitMatricula)} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="ano_letivo">Ano Letivo</Label>
+              <Input
+                id="ano_letivo"
+                type="number"
+                placeholder="2026"
+                {...matriculaForm.register("ano_letivo")}
+              />
+              {matriculaForm.formState.errors.ano_letivo && (
+                <p className="text-xs text-destructive">{matriculaForm.formState.errors.ano_letivo.message}</p>
               )}
             </div>
-            <Separator />
-            <div>
-              <p className="text-muted-foreground text-sm">Endereço</p>
-              {student.logradouro ? (
-                <p className="font-medium">
-                  {student.logradouro}, {student.numero}
-                  {student.complemento && ` - ${student.complemento}`}
-                </p>
-              ) : (
-                <p className="font-medium">—</p>
+
+            <div className="space-y-2">
+              <Label>Série</Label>
+              <Select
+                value={matriculaForm.watch("serie")}
+                onValueChange={(v) => matriculaForm.setValue("serie", v, { shouldValidate: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a série" />
+                </SelectTrigger>
+                <SelectContent>
+                  {grades.map((g) => (
+                    <SelectItem key={g} value={g}>{g}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {matriculaForm.formState.errors.serie && (
+                <p className="text-xs text-destructive">{matriculaForm.formState.errors.serie.message}</p>
               )}
-              <p className="text-sm text-muted-foreground">
-                {student.bairro} {student.cep && `• ${student.cep}`}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {student.cidadetelefone} {student.estadotelefone && `, ${student.estadotelefone}`}
-              </p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+
+            <div className="space-y-2">
+              <Label>Turno</Label>
+              <Select
+                value={matriculaForm.watch("turno")}
+                onValueChange={(v) => matriculaForm.setValue("turno", v, { shouldValidate: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o turno" />
+                </SelectTrigger>
+                <SelectContent>
+                  {shifts.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {matriculaForm.formState.errors.turno && (
+                <p className="text-xs text-destructive">{matriculaForm.formState.errors.turno.message}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select
+                value={matriculaForm.watch("status")}
+                onValueChange={(v) => matriculaForm.setValue("status", v, { shouldValidate: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione o status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {matriculaStatuses.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {matriculaForm.formState.errors.status && (
+                <p className="text-xs text-destructive">{matriculaForm.formState.errors.status.message}</p>
+              )}
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setMatriculaDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createMatriculaMutation.isPending}>
+                {createMatriculaMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Salvar"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <StudentForm
         open={formOpen}

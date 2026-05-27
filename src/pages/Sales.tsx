@@ -28,7 +28,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { alunosApi, produtosApi, recibosApi, Aluno, Produto, VendaItem } from "@/lib/api";
+import { alunosApi, produtosApi, recibosApi, Aluno, AlunoComMatriculas, getMatriculaAtiva, VendaItem } from "@/lib/api";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
@@ -44,7 +44,7 @@ export default function Sales() {
 
   const { data: alunosData } = useQuery({
     queryKey: ["alunos", "sales"],
-    queryFn: () => alunosApi.list({ limit: 500 }),
+    queryFn: () => alunosApi.list({ limit: 500, withMatriculas: true }),
   });
 
   const { data: produtos = [] } = useQuery({
@@ -60,21 +60,33 @@ export default function Sales() {
     setQuantities(initialQuantities);
   }, [produtos]);
 
-  const alunosAtivos = (alunosData?.items || []).filter((s) => s.situacao === "Ativo");
+  const alunosAtivos = ((alunosData?.items || []) as AlunoComMatriculas[]).filter((s) => s.situacao === "Ativo");
+
+  const serieDoAluno = useMemo(() => {
+    if (!selectedStudent) return null;
+    const matriculaAtiva = getMatriculaAtiva(selectedStudent as AlunoComMatriculas);
+    return matriculaAtiva?.serie || selectedStudent.serie;
+  }, [selectedStudent]);
+
+  const turnoDoAluno = useMemo(() => {
+    if (!selectedStudent) return null;
+    const matriculaAtiva = getMatriculaAtiva(selectedStudent as AlunoComMatriculas);
+    return matriculaAtiva?.turno || selectedStudent.turno;
+  }, [selectedStudent]);
 
   const produtosVisiveis = useMemo(() => {
     let list = produtos.filter((p) => p.status === "Ativo");
-    if (selectedStudent?.serie) {
+    if (serieDoAluno) {
       list = list.filter(
         (p) =>
           !p.serie_aplicavel ||
           p.serie_aplicavel === "" ||
           p.serie_aplicavel.toLowerCase() === "nenhuma" ||
-          p.serie_aplicavel === selectedStudent.serie
+          p.serie_aplicavel === serieDoAluno
       );
     }
     return list;
-  }, [produtos, selectedStudent]);
+  }, [produtos, serieDoAluno]);
 
   const setQuantidade = useCallback((id: string, qtd: number) => {
     setQuantities((prev) => ({
@@ -159,9 +171,10 @@ export default function Sales() {
       doc.setFont("helvetica", "normal");
       doc.text(`Nome: ${aluno.nome}`, margin, y);
       y += 6;
-      doc.text(`Série: ${aluno.serie}`, margin, y);
+      const matAtiva = getMatriculaAtiva(aluno as AlunoComMatriculas);
+      doc.text(`Série: ${matAtiva?.serie || aluno.serie}`, margin, y);
       y += 6;
-      doc.text(`Turno: ${aluno.turno}`, margin, y);
+      doc.text(`Turno: ${matAtiva?.turno || aluno.turno}`, margin, y);
       y += 12;
 
       const tableColumn = ["Qtd", "Descrição", "Vlr Unitário", "Subtotal"];
@@ -284,7 +297,7 @@ export default function Sales() {
                   >
                     <Search className="h-4 w-4 mr-2 text-muted-foreground" />
                     {selectedStudent
-                      ? `${selectedStudent.nome} - ${selectedStudent.serie}`
+                      ? `${selectedStudent.nome} - ${serieDoAluno || selectedStudent.serie}`
                       : "Buscar aluno..."}
                   </Button>
                 </PopoverTrigger>
@@ -307,7 +320,7 @@ export default function Sales() {
                             <div>
                               <span className="font-medium">{s.nome}</span>
                               <span className="text-muted-foreground ml-2 text-xs">
-                                {s.serie} - {s.turno}
+                                {getMatriculaAtiva(s as AlunoComMatriculas)?.serie || s.serie} - {getMatriculaAtiva(s as AlunoComMatriculas)?.turno || s.turno}
                               </span>
                             </div>
                           </CommandItem>
@@ -320,9 +333,9 @@ export default function Sales() {
               {selectedStudent && (
                 <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
                   <Badge variant="secondary" className="text-xs">
-                    {selectedStudent.serie}
+                    {serieDoAluno || selectedStudent.serie}
                   </Badge>
-                  <span>{selectedStudent.turno}</span>
+                  <span>{turnoDoAluno || selectedStudent.turno}</span>
                   <span className="text-xs text-muted-foreground/60">•</span>
                   <span className="text-xs">
                     Resp.: {selectedStudent.responsavelfinanceiro || "—"}

@@ -68,8 +68,9 @@ export interface DashboardMetrics {
 }
 
 export const alunosApi = {
-  list: async (params?: { page?: number; limit?: number; search?: string; serie?: string }) => {
-    let query = supabase.from("alunos").select("*", { count: "exact" });
+  list: async (params?: { page?: number; limit?: number; search?: string; serie?: string; withMatriculas?: boolean }) => {
+    const selectFields = params?.withMatriculas ? "*, matriculas(*)" : "*";
+    let query = supabase.from("alunos").select(selectFields, { count: "exact" });
 
     if (params?.search) {
       query = query.ilike("nome", `%${params.search}%`);
@@ -87,13 +88,14 @@ export const alunosApi = {
     const { data, count, error } = await query.order("nome", { ascending: true });
 
     if (error) throw error;
-    return { items: (data || []) as Aluno[], total: count || 0 };
+    const items = (data || []) as unknown[];
+    return { items: params?.withMatriculas ? items as AlunoComMatriculas[] : items as Aluno[], total: count || 0 };
   },
 
   get: async (id: string) => {
-    const { data, error } = await supabase.from("alunos").select("*").eq("id", id).single();
+    const { data, error } = await supabase.from("alunos").select("*, matriculas(*)").eq("id", id).single();
     if (error) throw error;
-    return data as Aluno;
+    return data as AlunoComMatriculas;
   },
 
   create: async (aluno: Partial<Aluno>) => {
@@ -167,6 +169,54 @@ export interface VendaItem {
   preco_unitario: number;
   quantidade: number;
   subtotal: number;
+}
+
+export interface Matricula {
+  id: string;
+  aluno_id: string;
+  ano_letivo: number;
+  serie: string;
+  turno: string;
+  status: "Ativo" | "Concluído" | "Transferido" | "Cancelado";
+  created_at: string;
+}
+
+export type AlunoComMatriculas = Aluno & { matriculas: Matricula[] };
+
+export const matriculasApi = {
+  list: async (alunoId: string) => {
+    const { data, error } = await supabase
+      .from("matriculas")
+      .select("*")
+      .eq("aluno_id", alunoId)
+      .order("ano_letivo", { ascending: false });
+    if (error) throw error;
+    return (data || []) as Matricula[];
+  },
+
+  create: async (matricula: {
+    aluno_id: string;
+    ano_letivo: number;
+    serie: string;
+    turno: string;
+    status: string;
+  }) => {
+    const { data, error } = await supabase
+      .from("matriculas")
+      .insert(matricula)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as Matricula;
+  },
+};
+
+export function getMatriculaAtiva(aluno: AlunoComMatriculas | Aluno): Matricula | null {
+  const matriculas = (aluno as AlunoComMatriculas).matriculas;
+  if (!matriculas || !Array.isArray(matriculas) || matriculas.length === 0) return null;
+  const ativas = matriculas.filter((m) => m.status === "Ativo");
+  if (ativas.length === 0) return null;
+  return ativas.reduce((a, b) => (a.ano_letivo > b.ano_letivo ? a : b));
 }
 
 export const produtosApi = {
