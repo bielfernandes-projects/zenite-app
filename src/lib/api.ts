@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase";
+import { LOGO_ESCOLA_BASE64, ASSINATURA_BASE64 } from "@/lib/assets";
 
 export interface Aluno {
   id: string;
@@ -268,6 +269,8 @@ export interface TemplateDocumento {
   titulo: string;
   conteudo: string;
   status: "Ativo" | "Inativo";
+  titulo_impresso?: string;
+  requer_assinatura?: boolean;
   created_at?: string;
 }
 
@@ -301,7 +304,7 @@ export const templatesApi = {
     return data as TemplateDocumento;
   },
 
-  create: async (template: { titulo: string; conteudo: string; status: string }) => {
+  create: async (template: { titulo: string; conteudo: string; status: string; titulo_impresso?: string; requer_assinatura?: boolean }) => {
     const { data, error } = await supabase
       .from("templates_documentos")
       .insert(template)
@@ -331,13 +334,38 @@ export const templatesApi = {
   },
 };
 
+export function formatarDataExtenso(): string {
+  const meses = [
+    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+  ];
+  const hoje = new Date();
+  return `Fortaleza, ${hoje.getDate()} de ${meses[hoje.getMonth()]} de ${hoje.getFullYear()}`;
+}
+
+function safe(valor: string | null | undefined): string {
+  return valor && valor.trim() ? valor : "Não informado";
+}
+
+function formatarData(d: string | null | undefined): string {
+  if (!d) return "Não informado";
+  const date = new Date(d + "T12:00:00");
+  if (isNaN(date.getTime())) return "Não informado";
+  return date.toLocaleDateString("pt-BR");
+}
+
 export function substituirTags(conteudo: string, aluno: Aluno, matriculaAtiva?: Matricula | null): string {
   const tags: Record<string, string> = {
-    "{{nome_aluno}}": aluno.nome,
-    "{{serie_aluno}}": matriculaAtiva?.serie || aluno.serie || "—",
-    "{{turno_aluno}}": matriculaAtiva?.turno || aluno.turno || "—",
-    "{{responsavel}}": aluno.responsavelfinanceiro || aluno.nomedamae || "—",
-    "{{data_atual}}": new Date().toLocaleDateString("pt-BR"),
+    "{{nome_aluno}}": safe(aluno.nome),
+    "{{data_nascimento}}": formatarData(aluno.datanascimento),
+    "{{serie_aluno}}": safe(matriculaAtiva?.serie || aluno.serie),
+    "{{turno_aluno}}": safe(matriculaAtiva?.turno || aluno.turno),
+    "{{nome_pai}}": safe(aluno.nomedopai),
+    "{{nome_mae}}": safe(aluno.nomedamae),
+    "{{responsavel}}": safe(aluno.responsavelfinanceiro || aluno.nomedamae),
+    "{{cpf_responsavel}}": safe(aluno.cpfrespfin),
+    "{{ano_letivo}}": matriculaAtiva?.ano_letivo ? String(matriculaAtiva.ano_letivo) : "Não informado",
+    "{{data_atual}}": formatarDataExtenso(),
   };
 
   let resultado = conteudo;
@@ -347,50 +375,89 @@ export function substituirTags(conteudo: string, aluno: Aluno, matriculaAtiva?: 
   return resultado;
 }
 
-export async function gerarDocumentoPDF(titulo: string, corpo: string): Promise<Blob> {
+export async function gerarDocumentoPDF(titulo: string, corpo: string, tituloImpresso?: string, requerAssinatura: boolean = true): Promise<Blob> {
   const { default: jsPDF } = await import("jspdf");
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   const margin = 20;
   const maxWidth = pageWidth - margin * 2;
+  const cx = pageWidth / 2;
 
-  doc.setFontSize(18);
-  doc.setFont("helvetica", "bold");
-  doc.text("ESCOLA ZÊNITE", pageWidth / 2, margin, { align: "center" });
+  const textX = 65;
 
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text("Ensino Fundamental - 6º ao 9º Ano", pageWidth / 2, margin + 6, { align: "center" });
-  doc.text("CNPJ: 00.000.000/0001-00", pageWidth / 2, margin + 12, { align: "center" });
-
-  doc.setDrawColor(21, 43, 33);
-  doc.setLineWidth(0.5);
-  doc.line(margin, margin + 16, pageWidth - margin, margin + 16);
-
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text(titulo, pageWidth / 2, margin + 26, { align: "center" });
-
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  const lines = doc.splitTextToSize(corpo, maxWidth);
-  let y = margin + 36;
-
-  for (const line of lines) {
-    if (y > pageHeight - 40) {
-      doc.addPage();
-      y = margin;
-    }
-    doc.text(line, margin, y);
-    y += 7;
+  if (LOGO_ESCOLA_BASE64) {
+    doc.addImage(LOGO_ESCOLA_BASE64, "PNG", 15, 15, 45, 30);
   }
 
-  y = pageHeight - 25;
-  doc.line(margin + 30, y, pageWidth - margin - 30, y);
-  y += 6;
-  doc.setFontSize(9);
-  doc.text("Assinatura do Diretor", pageWidth / 2, y, { align: "center" });
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("INSTITUTO INFANTIL TIA NEUMA", textX, 19);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  doc.text("Educação Infantil e Ensino Fundamental I", textX, 24);
+
+  doc.setFontSize(11);
+  doc.text("Rua: Alameda Ana Elisa, 133, Quadra 2, Cidade 2000 - Fortaleza-CE", textX, 29);
+
+  doc.text("Telefone: (85) 3212.1112", textX, 34);
+  doc.text("WhatsApp: (85) 9 9292-5662", textX + 45, 34);
+
+  doc.text("E-mail: institutotianeuma@gmail.com", textX, 39);
+
+  doc.text("INEP: 23075112", textX, 44);
+  doc.text("CNPJ: 05.813.399.0001-43", textX + 45, 44);
+
+  let y = 65;
+
+  const tituloDoc = (tituloImpresso || titulo).toUpperCase();
+
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text(tituloDoc, cx, y, { align: "center" });
+  y += 15;
+
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "normal");
+
+  const paragrafos = corpo.split(/\r?\n/);
+
+  for (const paragrafo of paragrafos) {
+    if (paragrafo.trim() === "") {
+      y += 6;
+    } else {
+      if (y > pageHeight - 60) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.text(paragrafo, margin, y, { maxWidth, align: "justify" });
+      const h = doc.getTextDimensions(paragrafo, { maxWidth }).h || 7;
+      y += h + 2;
+    }
+  }
+
+  y += 15;
+
+  doc.text(formatarDataExtenso(), pageWidth - margin, y, { align: "right" });
+
+  if (requerAssinatura) {
+    y += 25;
+
+    if (ASSINATURA_BASE64) {
+      doc.addImage(ASSINATURA_BASE64, "PNG", cx - 20, y, 40, 20);
+      y += 24;
+    }
+
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Vicente Herbet Fernandes Evangelista", cx, y, { align: "center" });
+    y += 6;
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "normal");
+    doc.text("Diretor Pedagógico", cx, y, { align: "center" });
+  }
 
   return doc.output("blob");
 }

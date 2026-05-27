@@ -28,7 +28,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { toast } from "sonner";
-import { alunosApi, produtosApi, recibosApi, Aluno, AlunoComMatriculas, getMatriculaAtiva, VendaItem } from "@/lib/api";
+import { alunosApi, produtosApi, recibosApi, Aluno, AlunoComMatriculas, getMatriculaAtiva, VendaItem, formatarDataExtenso } from "@/lib/api";
+import { LOGO_ESCOLA_BASE64, ASSINATURA_BASE64 } from "@/lib/assets";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
@@ -135,17 +136,22 @@ export default function Sales() {
       const margin = 20;
       let y = margin;
 
+      if (LOGO_ESCOLA_BASE64) {
+        doc.addImage(LOGO_ESCOLA_BASE64, "PNG", pageWidth / 2 - 20, y, 40, 40);
+        y += 45;
+      }
+
       doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
       doc.text("ESCOLA ZÊNITE", pageWidth / 2, y, { align: "center" });
-      y += 6;
+      y += 8;
 
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
       doc.text("Ensino Fundamental - 6º ao 9º Ano", pageWidth / 2, y, { align: "center" });
       y += 6;
       doc.text(`CNPJ: 00.000.000/0001-00`, pageWidth / 2, y, { align: "center" });
-      y += 14;
+      y += 12;
 
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
@@ -210,13 +216,23 @@ export default function Sales() {
       });
       y = finalY + 20;
 
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
+      doc.line(margin + 30, y, pageWidth - margin - 30, y);
+      y += 8;
+
+      if (ASSINATURA_BASE64) {
+        doc.addImage(ASSINATURA_BASE64, "PNG", pageWidth / 2 - 20, y, 40, 20);
+        y += 24;
+      }
+
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text("Vicente Herbet Fernandes Evangelista", pageWidth / 2, y, { align: "center" });
+      y += 6;
       doc.setFontSize(9);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(100);
-      const linhaY = pageWidth - 40;
-      doc.line(margin + 30, y, linhaY, y);
-      y += 8;
-      doc.text("Assinatura da Secretaria", pageWidth / 2, y, { align: "center" });
+      doc.text("Diretor Pedagógico", pageWidth / 2, y, { align: "center" });
 
       return doc.output("blob");
     },

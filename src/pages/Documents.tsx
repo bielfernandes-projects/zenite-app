@@ -49,6 +49,7 @@ import {
 } from "@/components/ui/sheet";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { toast } from "sonner";
 import {
@@ -64,9 +65,14 @@ import {
 
 const availableTags = [
   { label: "Nome do Aluno", tag: "{{nome_aluno}}" },
+  { label: "Data de Nascimento", tag: "{{data_nascimento}}" },
   { label: "Série", tag: "{{serie_aluno}}" },
   { label: "Turno", tag: "{{turno_aluno}}" },
-  { label: "Responsável", tag: "{{responsavel}}" },
+  { label: "Nome do Pai", tag: "{{nome_pai}}" },
+  { label: "Nome da Mãe", tag: "{{nome_mae}}" },
+  { label: "Resp. Fin.", tag: "{{responsavel}}" },
+  { label: "CPF do Resp. Fin.", tag: "{{cpf_responsavel}}" },
+  { label: "Ano Letivo", tag: "{{ano_letivo}}" },
   { label: "Data Atual", tag: "{{data_atual}}" },
 ];
 
@@ -83,6 +89,8 @@ export default function Documents() {
   const [titulo, setTitulo] = useState("");
   const [conteudo, setConteudo] = useState("");
   const [status, setStatus] = useState<"Ativo" | "Inativo">("Ativo");
+  const [tituloImpresso, setTituloImpresso] = useState("");
+  const [requerAssinatura, setRequerAssinatura] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const { data: alunos } = useQuery({
@@ -101,23 +109,49 @@ export default function Documents() {
   });
 
   const createMutation = useMutation({
-    mutationFn: () => templatesApi.create({ titulo, conteudo, status }),
+    mutationFn: () => {
+      const payload = {
+        titulo: titulo.trim(),
+        conteudo: conteudo.trim(),
+        status,
+        titulo_impresso: tituloImpresso.trim() || "DECLARAÇÃO",
+        requer_assinatura: Boolean(requerAssinatura),
+      };
+      return templatesApi.create(payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["templates-documentos"] });
+      queryClient.refetchQueries({ queryKey: ["templates-documentos"] });
       toast.success("Template criado com sucesso!");
       handleCloseTemplateSheet();
     },
-    onError: () => toast.error("Erro ao criar template."),
+    onError: (err) => {
+      console.error("Erro ao criar template:", err);
+      toast.error("Erro ao criar template.");
+    },
   });
 
   const updateMutation = useMutation({
-    mutationFn: () => templatesApi.update(editingTemplate!.id, { titulo, conteudo, status }),
+    mutationFn: () => {
+      const payload = {
+        titulo: titulo.trim(),
+        conteudo: conteudo.trim(),
+        status,
+        titulo_impresso: tituloImpresso.trim() || "DECLARAÇÃO",
+        requer_assinatura: Boolean(requerAssinatura),
+      };
+      return templatesApi.update(editingTemplate!.id, payload);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["templates-documentos"] });
+      queryClient.refetchQueries({ queryKey: ["templates-documentos"] });
       toast.success("Template atualizado com sucesso!");
       handleCloseTemplateSheet();
     },
-    onError: () => toast.error("Erro ao atualizar template."),
+    onError: (err) => {
+      console.error("Erro ao atualizar template:", err);
+      toast.error("Erro ao atualizar template.");
+    },
   });
 
   const deleteMutation = useMutation({
@@ -126,7 +160,10 @@ export default function Documents() {
       queryClient.invalidateQueries({ queryKey: ["templates-documentos"] });
       toast.success("Template excluído com sucesso!");
     },
-    onError: () => toast.error("Erro ao excluir template."),
+    onError: (err) => {
+      console.error("Erro ao excluir template:", err);
+      toast.error("Erro ao excluir template.");
+    },
   });
 
   const alunosAtivos = ((alunos?.items || []) as AlunoComMatriculas[]).filter((s) => s.situacao === "Ativo");
@@ -141,7 +178,7 @@ export default function Documents() {
     try {
       const matriculaAtiva = getMatriculaAtiva(selectedStudent as AlunoComMatriculas);
       const corpo = substituirTags(selectedTemplate.conteudo, selectedStudent, matriculaAtiva);
-      const blob = await gerarDocumentoPDF(selectedTemplate.titulo, corpo);
+      const blob = await gerarDocumentoPDF(selectedTemplate.titulo, corpo, selectedTemplate.titulo_impresso, selectedTemplate.requer_assinatura);
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -164,6 +201,8 @@ export default function Documents() {
     setTitulo("");
     setConteudo("");
     setStatus("Ativo");
+    setTituloImpresso("");
+    setRequerAssinatura(true);
   };
 
   const handleOpenCreate = () => {
@@ -171,6 +210,8 @@ export default function Documents() {
     setTitulo("");
     setConteudo("");
     setStatus("Ativo");
+    setTituloImpresso("");
+    setRequerAssinatura(true);
     setTemplateSheetOpen(true);
   };
 
@@ -179,6 +220,8 @@ export default function Documents() {
     setTitulo(template.titulo);
     setConteudo(template.conteudo);
     setStatus(template.status);
+    setTituloImpresso(template.titulo_impresso || "DECLARAÇÃO");
+    setRequerAssinatura(template.requer_assinatura ?? true);
     setTemplateSheetOpen(true);
   };
 
@@ -398,6 +441,7 @@ export default function Documents() {
                   <TableHeader>
                     <TableRow className="bg-muted/30">
                       <TableHead>Título</TableHead>
+                      <TableHead>Título Impresso</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="hidden md:table-cell">Conteúdo</TableHead>
                       <TableHead className="w-20"></TableHead>
@@ -407,6 +451,7 @@ export default function Documents() {
                     {templates.map((t) => (
                       <TableRow key={t.id}>
                         <TableCell className="font-medium">{t.titulo}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{t.titulo_impresso || "—"}</TableCell>
                         <TableCell>
                           <Badge
                             variant="outline"
@@ -475,6 +520,16 @@ export default function Documents() {
               </Select>
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="titulo_impresso">Título Impresso no Documento</Label>
+              <Input
+                id="titulo_impresso"
+                value={tituloImpresso}
+                onChange={(e) => setTituloImpresso(e.target.value)}
+                placeholder="Ex: DECLARAÇÃO DE MATRÍCULA"
+              />
+            </div>
+
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Tags className="h-4 w-4 text-muted-foreground" />
@@ -504,6 +559,17 @@ export default function Documents() {
                 placeholder="Escreva o texto do documento usando as tags acima..."
                 className="min-h-[300px] font-mono text-sm leading-relaxed"
               />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Switch
+                id="requer_assinatura"
+                checked={requerAssinatura}
+                onCheckedChange={setRequerAssinatura}
+              />
+              <Label htmlFor="requer_assinatura" className="text-sm font-normal leading-none cursor-pointer">
+                Incluir Assinatura da Direção no rodapé deste documento
+              </Label>
             </div>
           </div>
 
