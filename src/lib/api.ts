@@ -263,85 +263,134 @@ export const recibosApi = {
   },
 };
 
-export const documentosApi = {
-  listTemplates: async () => {
-    return [
-      { id: "declaracao", name: "Declaração de Matrícula" },
-      { id: "recibo", name: "Recibo de Pagamento" },
-      { id: "historico", name: "Histórico Escolar" },
-    ];
+export interface TemplateDocumento {
+  id: string;
+  titulo: string;
+  conteudo: string;
+  status: "Ativo" | "Inativo";
+  created_at?: string;
+}
+
+export const templatesApi = {
+  list: async () => {
+    const { data, error } = await supabase
+      .from("templates_documentos")
+      .select("*")
+      .order("titulo", { ascending: true });
+    if (error) throw error;
+    return (data || []) as TemplateDocumento[];
   },
 
-  generate: async (template: string, aluno: Aluno) => {
-    const { default: jsPDF } = await import("jspdf");
+  listAtivos: async () => {
+    const { data, error } = await supabase
+      .from("templates_documentos")
+      .select("*")
+      .eq("status", "Ativo")
+      .order("titulo", { ascending: true });
+    if (error) throw error;
+    return (data || []) as TemplateDocumento[];
+  },
 
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 20;
-    const lh = 7;
-    let y = margin;
+  get: async (id: string) => {
+    const { data, error } = await supabase
+      .from("templates_documentos")
+      .select("*")
+      .eq("id", id)
+      .single();
+    if (error) throw error;
+    return data as TemplateDocumento;
+  },
 
-    doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text("Zênite - Sistema de Gestão Escolar", pageWidth / 2, y, { align: "center" });
-    y += 10;
+  create: async (template: { titulo: string; conteudo: string; status: string }) => {
+    const { data, error } = await supabase
+      .from("templates_documentos")
+      .insert(template)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as TemplateDocumento;
+  },
 
-    doc.setFontSize(12);
-    doc.setFont("helvetica", "bold");
-    doc.text(templateLabel(template), pageWidth / 2, y, { align: "center" });
-    y += 12;
+  update: async (id: string, template: Partial<TemplateDocumento>) => {
+    const { data, error } = await supabase
+      .from("templates_documentos")
+      .update(template)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as TemplateDocumento;
+  },
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-
-    const lines: string[] = [];
-
-    if (template === "declaracao") {
-      lines.push(
-        `Declaramos para os devidos fins que o(a) aluno(a) ${aluno.nome},`,
-        `regularmente matriculado(a) no ${aluno.serie}, turno ${aluno.turno},`,
-        `é aluno(a) desta instituição de ensino.`,
-        "",
-        `Responsável financeiro: ${aluno.responsavelfinanceiro || "—"}`,
-      );
-    } else if (template === "recibo") {
-      const valor = aluno.valormensalidade
-        ? `R$ ${aluno.valormensalidade.toFixed(2).replace(".", ",")}`
-        : "—";
-      lines.push(
-        `Recebemos de ${aluno.responsavelfinanceiro || aluno.nome} o valor de ${valor}`,
-        `referente à mensalidade do(a) aluno(a) ${aluno.nome}, matriculado(a) no`,
-        `${aluno.serie}, turno ${aluno.turno}.`,
-        "",
-        `Vencimento: dia ${aluno.datadovencimento || "—"}`,
-      );
-    } else if (template === "historico") {
-      lines.push(
-        `Nome: ${aluno.nome}`,
-        `Série: ${aluno.serie}`,
-        `Turno: ${aluno.turno}`,
-        `Data de Nascimento: ${aluno.datanascimento ? new Date(aluno.datanascimento + "T12:00:00").toLocaleDateString("pt-BR") : "—"}`,
-        `Naturalidade: ${aluno.naturalidade || "—"}`,
-        `Nome da Mãe: ${aluno.nomedamae || "—"}`,
-        `Nome do Pai: ${aluno.nomedopai || "—"}`,
-      );
-    }
-
-    lines.push("", `Emitido em: ${new Date().toLocaleDateString("pt-BR")}`);
-    lines.forEach((line) => {
-      doc.text(line, margin, y);
-      y += lh;
-    });
-
-    return doc.output("blob");
+  delete: async (id: string) => {
+    const { error } = await supabase
+      .from("templates_documentos")
+      .delete()
+      .eq("id", id);
+    if (error) throw error;
   },
 };
 
-function templateLabel(template: string): string {
-  const labels: Record<string, string> = {
-    declaracao: "DECLARAÇÃO DE MATRÍCULA",
-    recibo: "RECIBO DE PAGAMENTO",
-    historico: "HISTÓRICO ESCOLAR",
+export function substituirTags(conteudo: string, aluno: Aluno, matriculaAtiva?: Matricula | null): string {
+  const tags: Record<string, string> = {
+    "{{nome_aluno}}": aluno.nome,
+    "{{serie_aluno}}": matriculaAtiva?.serie || aluno.serie || "—",
+    "{{turno_aluno}}": matriculaAtiva?.turno || aluno.turno || "—",
+    "{{responsavel}}": aluno.responsavelfinanceiro || aluno.nomedamae || "—",
+    "{{data_atual}}": new Date().toLocaleDateString("pt-BR"),
   };
-  return labels[template] || "DOCUMENTO";
+
+  let resultado = conteudo;
+  for (const [tag, valor] of Object.entries(tags)) {
+    resultado = resultado.replace(new RegExp(tag.replace(/[{}]/g, "\\$&"), "g"), valor);
+  }
+  return resultado;
+}
+
+export async function gerarDocumentoPDF(titulo: string, corpo: string): Promise<Blob> {
+  const { default: jsPDF } = await import("jspdf");
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  const maxWidth = pageWidth - margin * 2;
+
+  doc.setFontSize(18);
+  doc.setFont("helvetica", "bold");
+  doc.text("ESCOLA ZÊNITE", pageWidth / 2, margin, { align: "center" });
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  doc.text("Ensino Fundamental - 6º ao 9º Ano", pageWidth / 2, margin + 6, { align: "center" });
+  doc.text("CNPJ: 00.000.000/0001-00", pageWidth / 2, margin + 12, { align: "center" });
+
+  doc.setDrawColor(21, 43, 33);
+  doc.setLineWidth(0.5);
+  doc.line(margin, margin + 16, pageWidth - margin, margin + 16);
+
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(titulo, pageWidth / 2, margin + 26, { align: "center" });
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "normal");
+  const lines = doc.splitTextToSize(corpo, maxWidth);
+  let y = margin + 36;
+
+  for (const line of lines) {
+    if (y > pageHeight - 40) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.text(line, margin, y);
+    y += 7;
+  }
+
+  y = pageHeight - 25;
+  doc.line(margin + 30, y, pageWidth - margin - 30, y);
+  y += 6;
+  doc.setFontSize(9);
+  doc.text("Assinatura do Diretor", pageWidth / 2, y, { align: "center" });
+
+  return doc.output("blob");
 }
