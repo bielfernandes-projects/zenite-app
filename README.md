@@ -6,10 +6,12 @@ Frontend React com Vite, TypeScript, Tailwind CSS e shadcn/ui.
 
 - **Framework:** React 18 + Vite
 - **Styling:** Tailwind CSS + shadcn/ui
-- **State:** React Query + Zustand (via AuthContext)
+- **State:** TanStack React Query
 - **Forms:** React Hook Form + Zod
-- **Auth:** Supabase Auth
+- **Auth:** Supabase Auth (modo demo automático)
+- **Database:** Supabase (PostgreSQL)
 - **Charts:** Recharts
+- **PDF:** jsPDF
 - **Package Manager:** Bun
 
 ## Comandos
@@ -33,7 +35,6 @@ bun test
 1. Copiar `.env.example` para `.env` e configurar:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_API_URL` (opcional, padrão: http://localhost:8000)
 
 2. Iniciar desenvolvimento:
    ```bash
@@ -45,21 +46,18 @@ bun test
 ```
 src/
 ├── contexts/       # AuthContext
-├── components/    # Componentes UI + AppLayout
-├── pages/         # Dashboard, Students, Documents, Login
-├── lib/           # Supabase client, API layer
-├── data/          # Mock data
-└── hooks/         # Custom hooks
+├── components/     # Componentes UI + AppLayout
+├── pages/          # Dashboard, Students, StudentProfile, Documents, Login
+├── lib/            # Supabase client, API layer, masks, utils
+└── hooks/          # Custom hooks
 ```
 
-## API
+## Banco de Dados (Supabase)
 
-O backend deve expor:
-- `GET /api/v1/alunos` - Lista alunos (paginação, filtros)
-- `GET /api/v1/alunos/:id` - Detalhes do aluno
-- `POST /api/v1/alunos` - Criar aluno
-- `PUT /api/v1/alunos/:id` - Atualizar aluno
-- `DELETE /api/v1/alunos/:id` - Excluir aluno
-- `GET /api/v1/dashboard/metrics` - Métricas
-- `GET /api/v1/documentos/templates` - Lista templates
-- `POST /api/v1/documentos/gerar` - Gerar PDF
+O sistema usa Supabase diretamente (sem backend intermediário). Tabelas principais:
+
+- **`alunos`** — Dados cadastrais dos alunos
+- **`matriculas`** — Histórico de matrículas por ano letivo
+- **`produtos`** — Produtos para venda (fardamento, material, taxa)
+- **`recibos`** — Recibos de pagamento
+- **`templates_documentos`** — Templates de documentos editáveis

@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { User, LogOut, Settings, Bell } from "lucide-react";
+import { User, LogOut, Settings } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -93,16 +93,6 @@ export function AppHeader() {
       </div>
 
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="relative hover:bg-accent">
-          <Bell className="h-4 w-4" />
-          <Badge 
-            variant="destructive" 
-            className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center text-[10px]"
-          >
-            3
-          </Badge>
-        </Button>
-        
         <Separator orientation="vertical" className="h-6" />
         
         <DropdownMenu>

@@ -179,12 +179,22 @@ export interface Matricula {
   serie: string;
   turno: string;
   status: "Ativo" | "Concluído" | "Transferido" | "Cancelado";
+  data_matricula?: string;
   created_at: string;
 }
 
 export type AlunoComMatriculas = Aluno & { matriculas: Matricula[] };
 
 export const matriculasApi = {
+  listAll: async () => {
+    const { data, error } = await supabase
+      .from("matriculas")
+      .select("*")
+      .order("data_matricula", { ascending: true });
+    if (error) throw error;
+    return (data || []) as Matricula[];
+  },
+
   list: async (alunoId: string) => {
     const { data, error } = await supabase
       .from("matriculas")
@@ -201,6 +211,7 @@ export const matriculasApi = {
     serie: string;
     turno: string;
     status: string;
+    data_matricula?: string;
   }) => {
     const { data, error } = await supabase
       .from("matriculas")
@@ -457,6 +468,141 @@ export async function gerarDocumentoPDF(titulo: string, corpo: string, tituloImp
     doc.setFontSize(11);
     doc.setFont("helvetica", "normal");
     doc.text("Diretor Pedagógico", cx, y, { align: "center" });
+  }
+
+  return doc.output("blob");
+}
+
+export async function gerarFichaAlunoPDF(aluno: Aluno, matriculas: Matricula[]): Promise<Blob> {
+  const { default: jsPDF } = await import("jspdf");
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 20;
+  const cx = pageWidth / 2;
+  const textX = 65;
+
+  if (LOGO_ESCOLA_BASE64) {
+    doc.addImage(LOGO_ESCOLA_BASE64, "PNG", 15, 15, 45, 30);
+  }
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("INSTITUTO INFANTIL TIA NEUMA", textX, 19);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(12);
+  doc.text("Educação Infantil e Ensino Fundamental I", textX, 24);
+  doc.setFontSize(11);
+  doc.text("Rua: Alameda Ana Elisa, 133, Quadra 2, Cidade 2000 - Fortaleza-CE", textX, 29);
+  doc.text("Telefone: (85) 3212.1112", textX, 34);
+  doc.text("WhatsApp: (85) 9 9292-5662", textX + 45, 34);
+  doc.text("E-mail: institutotianeuma@gmail.com", textX, 39);
+  doc.text("INEP: 23075112", textX, 44);
+  doc.text("CNPJ: 05.813.399.0001-43", textX + 45, 44);
+
+  let y = 65;
+
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("FICHA DO ALUNO", cx, y, { align: "center" });
+  y += 18;
+
+  // Dados Pessoais
+  doc.setFontSize(14);
+  doc.text("Dados Pessoais", margin, y);
+  y += 10;
+
+  const fields: [string, string][] = [
+    ["Nome", aluno.nome],
+    ["Data de Nascimento", formatarData(aluno.datanascimento)],
+    ["Série", aluno.serie],
+    ["Turno", aluno.turno],
+    ["RG", safe(aluno.rg)],
+    ["CPF", safe(aluno.cpf)],
+    ["NIS", safe(aluno.nis)],
+    ["Naturalidade", safe(aluno.naturalidade)],
+    ["Mãe", safe(aluno.nomedamae)],
+    ["Pai", safe(aluno.nomedopai)],
+    ["Responsável Financeiro", safe(aluno.responsavelfinanceiro)],
+    ["Telefone", safe(aluno.telefone1)],
+    ["Endereço", `${aluno.logradouro}, ${aluno.numero}${aluno.bairro ? ` - ${aluno.bairro}` : ""}`],
+    ["CEP", safe(aluno.cep)],
+    ["Cidade/Estado", `${aluno.cidadetelefone || ""}/${aluno.estadotelefone || ""}`],
+  ];
+
+  doc.setFontSize(10);
+  for (const [label, value] of fields) {
+    if (y > pageHeight - 40) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.setFont("helvetica", "bold");
+    doc.text(`${label}:`, margin, y);
+    doc.setFont("helvetica", "normal");
+    const labelWidth = doc.getTextWidth(`${label}: `);
+    doc.text(String(value), margin + labelWidth + 2, y);
+    y += 6;
+  }
+
+  y += 12;
+
+  // Histórico de Matrícula
+  if (y > pageHeight - 60) {
+    doc.addPage();
+    y = margin;
+  }
+
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("Histórico de Matrícula", margin, y);
+  y += 10;
+
+  const grades = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"];
+  const colWidths = [25, 35, 30, 40, 30];
+  const headers = ["Série", "Ano Letivo", "Turno", "Data Matrícula", "Status"];
+  const tableX = margin;
+
+  const matriculaBySerie = new Map(matriculas.map((m) => [m.serie, m]));
+
+  const drawTableHeader = (yy: number) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    let xx = tableX;
+    headers.forEach((h, i) => {
+      doc.text(h, xx + 2, yy);
+      xx += colWidths[i];
+    });
+    doc.line(tableX, yy + 1, tableX + colWidths.reduce((a, b) => a + b, 0), yy + 1);
+    return yy + 8;
+  };
+
+  y = drawTableHeader(y);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  for (const grade of grades) {
+    if (y > pageHeight - 30) {
+      doc.addPage();
+      y = margin;
+      y = drawTableHeader(y);
+    }
+
+    const m = matriculaBySerie.get(grade);
+    const row = [
+      grade,
+      m?.ano_letivo?.toString() || "",
+      m?.turno || "",
+      m?.data_matricula ? formatarData(m.data_matricula) : "",
+      m?.status || "",
+    ];
+
+    let xx = tableX;
+    row.forEach((cell, i) => {
+      doc.text(cell, xx + 2, y);
+      xx += colWidths[i];
+    });
+    y += 7;
   }
 
   return doc.output("blob");

@@ -1,10 +1,10 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Edit, Trash2, MapPin, Calendar, User, Contact, Loader2, GraduationCap, Phone, Plus, BookOpen } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, MapPin, Calendar, User, Contact, Loader2, GraduationCap, Phone, Plus, BookOpen, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
 import { Separator } from "@/components/ui/separator";
 import {
   Table,
@@ -37,7 +37,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { alunosApi, matriculasApi, AlunoComMatriculas, Matricula } from "@/lib/api";
+import { alunosApi, matriculasApi, gerarFichaAlunoPDF, AlunoComMatriculas, Matricula } from "@/lib/api";
 import { toast } from "sonner";
 import { StudentForm } from "@/components/StudentForm";
 import { useState, useEffect } from "react";
@@ -45,7 +45,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
-const grades = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano", "6º Ano", "7º Ano", "8º Ano", "9º Ano"];
+const grades = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"];
 const shifts = ["Manhã", "Tarde", "Integral"];
 const matriculaStatuses = ["Ativo", "Concluído", "Transferido", "Cancelado"];
 
@@ -54,6 +54,7 @@ const matriculaSchema = z.object({
   serie: z.string().min(1, "Selecione a série"),
   turno: z.string().min(1, "Selecione o turno"),
   status: z.string().min(1, "Selecione o status"),
+  data_matricula: z.string().min(1, "Campo obrigatório"),
 });
 
 type MatriculaFormData = z.infer<typeof matriculaSchema>;
@@ -97,6 +98,7 @@ export default function StudentProfile() {
       serie: "",
       turno: "",
       status: "Ativo",
+      data_matricula: new Date().toISOString().split("T")[0],
     },
   });
 
@@ -125,17 +127,10 @@ export default function StudentProfile() {
         serie: "",
         turno: "",
         status: "Ativo",
+        data_matricula: new Date().toISOString().split("T")[0],
       });
     }
   }, [matriculaDialogOpen, matriculaForm]);
-
-  const getInitials = (name: string) =>
-    name
-      .split(" ")
-      .slice(0, 2)
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase();
 
   const formatCurrency = (value?: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
@@ -153,6 +148,16 @@ export default function StudentProfile() {
 
   const onSubmitMatricula = (data: MatriculaFormData) => {
     createMatriculaMutation.mutate(data);
+  };
+
+  const handlePrintFicha = async () => {
+    try {
+      const blob = await gerarFichaAlunoPDF(student, matriculas);
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+    } catch {
+      toast.error("Erro ao gerar ficha do aluno.");
+    }
   };
 
   const getStatusBadgeColor = (status: string) => {
@@ -194,6 +199,10 @@ export default function StudentProfile() {
           Voltar
         </Button>
         <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handlePrintFicha}>
+            <Printer className="h-4 w-4 mr-2" />
+            Imprimir Ficha
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setFormOpen(true)}>
             <Edit className="h-4 w-4 mr-2" />
             Editar
@@ -219,11 +228,6 @@ export default function StudentProfile() {
       <Card className="border-none shadow-lg">
         <CardContent className="pt-6">
           <div className="flex items-start gap-6">
-            <Avatar className="h-20 w-20">
-              <AvatarFallback className="bg-primary/10 text-primary text-2xl font-semibold">
-                {getInitials(student.nome)}
-              </AvatarFallback>
-            </Avatar>
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-2xl font-bold text-foreground">{student.nome}</h1>
@@ -262,13 +266,13 @@ export default function StudentProfile() {
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
-            Histórico Escolar
+            Histórico de Matrícula
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="personal" className="space-y-6">
           {/* Info Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Dados Pessoais */}
             <Card className="border-none shadow-sm">
               <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
@@ -279,12 +283,12 @@ export default function StudentProfile() {
               </CardHeader>
               <CardContent className="pt-4 space-y-3">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground text-sm">Mensalidade</span>
-                  <span className="font-medium">{formatCurrency(student.valormensalidade)}</span>
+                  <span className="text-muted-foreground text-sm">Gênero</span>
+                  <span className="font-medium">{student.genero || "—"}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground text-sm">Vencimento</span>
-                  <span className="font-medium">Dia {student.datadovencimento || 10}</span>
+                  <span className="text-muted-foreground text-sm">Raça/Cor</span>
+                  <span className="font-medium">{student.raça || "—"}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between">
@@ -294,6 +298,15 @@ export default function StudentProfile() {
                 <div className="flex justify-between">
                   <span className="text-muted-foreground text-sm">Cidade/UF</span>
                   <span className="font-medium">{student.cidade ? `${student.cidade}/${student.estado}` : "—"}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Mensalidade</span>
+                  <span className="font-medium">{formatCurrency(student.valormensalidade)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Vencimento</span>
+                  <span className="font-medium">Dia {student.datadovencimento || 10}</span>
                 </div>
               </CardContent>
             </Card>
@@ -311,18 +324,26 @@ export default function StudentProfile() {
                   <p className="text-muted-foreground text-sm">Mãe</p>
                   <p className="font-medium">{student.nomedamae || "—"}</p>
                   {student.cpfmae && <p className="text-sm text-muted-foreground">CPF: {student.cpfmae}</p>}
+                  {student.rgmae && <p className="text-sm text-muted-foreground">RG: {student.rgmae}</p>}
                 </div>
                 <Separator />
                 <div>
                   <p className="text-muted-foreground text-sm">Pai</p>
                   <p className="font-medium">{student.nomedopai || "—"}</p>
                   {student.cpfdopai && <p className="text-sm text-muted-foreground">CPF: {student.cpfdopai}</p>}
+                  {student.rgdopai && <p className="text-sm text-muted-foreground">RG: {student.rgdopai}</p>}
                 </div>
                 <Separator />
                 <div>
                   <p className="text-muted-foreground text-sm">Resp. Financeiro</p>
                   <p className="font-medium">{student.responsavelfinanceiro || "—"}</p>
                   {student.cpfrespfin && <p className="text-sm text-muted-foreground">CPF: {student.cpfrespfin}</p>}
+                  {student.rgrespfin && <p className="text-sm text-muted-foreground">RG: {student.rgrespfin}</p>}
+                  {student.datanascimentoresponsavelfin && <p className="text-sm text-muted-foreground">Nascimento: {formatDate(student.datanascimentoresponsavelfin)}</p>}
+                </div>
+                <div>
+                  <p className="text-muted-foreground text-sm">Filiação</p>
+                  <p className="font-medium">{student.filiacaoresponsavelfin || "—"}</p>
                 </div>
                 {student.possuiirmao && student.nomeirmao && (
                   <>
@@ -388,6 +409,57 @@ export default function StudentProfile() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Documentos */}
+            <Card className="border-none shadow-sm">
+              <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4" />
+                  Documentos
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 space-y-3">
+                <p className="text-muted-foreground text-sm font-medium">Outros dados do aluno(a)</p>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">RG</span>
+                  <span className="font-medium">{student.rg || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">CPF</span>
+                  <span className="font-medium">{student.cpf || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">NIS</span>
+                  <span className="font-medium">{student.nis || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">CIA</span>
+                  <span className="font-medium">{student.cia || "—"}</span>
+                </div>
+                <Separator />
+                <p className="text-muted-foreground text-sm font-medium">Dados do Cartório</p>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Nome do Cartório</span>
+                  <span className="font-medium">{student.nomedocartorio || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Nº Termo</span>
+                  <span className="font-medium">{student.numerodotermo || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Livro</span>
+                  <span className="font-medium">{student.livro || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Folha</span>
+                  <span className="font-medium">{student.folha || "—"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground text-sm">Matrícula Cartório</span>
+                  <span className="font-medium">{student.matriculadocartorio || "—"}</span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
@@ -408,36 +480,39 @@ export default function StudentProfile() {
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ) : matriculas.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-sm">
-                  Nenhuma matrícula cadastrada.
-                </div>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/30">
-                      <TableHead className="text-xs">Ano Letivo</TableHead>
                       <TableHead className="text-xs">Série</TableHead>
+                      <TableHead className="text-xs">Ano Letivo</TableHead>
                       <TableHead className="text-xs">Turno</TableHead>
+                      <TableHead className="text-xs">Data da Matrícula</TableHead>
                       <TableHead className="text-xs">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {matriculas.map((matricula) => (
-                      <TableRow key={matricula.id}>
-                        <TableCell className="font-medium">{matricula.ano_letivo}</TableCell>
-                        <TableCell>{matricula.serie}</TableCell>
-                        <TableCell>{matricula.turno}</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={getStatusBadgeColor(matricula.status)}
-                          >
-                            {matricula.status}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {(() => {
+                      const matriculaBySerie = new Map(matriculas.map((m) => [m.serie, m]));
+                      return grades.map((grade) => {
+                        const m = matriculaBySerie.get(grade);
+                        return (
+                          <TableRow key={grade}>
+                            <TableCell className="font-medium">{grade}</TableCell>
+                            <TableCell>{m?.ano_letivo ?? ""}</TableCell>
+                            <TableCell>{m?.turno ?? ""}</TableCell>
+                            <TableCell>{m?.data_matricula ? formatDate(m.data_matricula) : ""}</TableCell>
+                            <TableCell>
+                              {m?.status ? (
+                                <Badge variant="outline" className={getStatusBadgeColor(m.status)}>
+                                  {m.status}
+                                </Badge>
+                              ) : ""}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      });
+                    })()}
                   </TableBody>
                 </Table>
               )}
@@ -529,6 +604,18 @@ export default function StudentProfile() {
               )}
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="data_matricula">Data da Matrícula *</Label>
+              <Input
+                id="data_matricula"
+                type="date"
+                {...matriculaForm.register("data_matricula")}
+              />
+              {matriculaForm.formState.errors.data_matricula && (
+                <p className="text-xs text-destructive">{matriculaForm.formState.errors.data_matricula.message}</p>
+              )}
+            </div>
+
             <DialogFooter className="pt-2">
               <Button
                 type="button"
@@ -559,6 +646,7 @@ export default function StudentProfile() {
         onSave={() => {
           queryClient.invalidateQueries({ queryKey: ["aluno", id] });
           queryClient.invalidateQueries({ queryKey: ["alunos"] });
+          queryClient.invalidateQueries({ queryKey: ["matriculas", id] });
         }}
       />
     </div>

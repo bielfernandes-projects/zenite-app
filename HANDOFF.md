@@ -15,7 +15,7 @@
 | Autenticação | Supabase Auth |
 | Ícones | Lucide React |
 | Gráficos | Recharts |
-| HTTP Client | Axios |
+| HTTP Client | Supabase JS Client (fetch direto) |
 | Testes Unitários | Vitest |
 | Testes E2E | Playwright |
 | Gerenciador | Bun |
@@ -47,7 +47,7 @@ VITE_API_URL=http://localhost:8000
 | `/login` | `Login.tsx` | Login com Supabase Auth (modo demo se sem credenciais) |
 | `/` | `Dashboard.tsx` | Métricas, cards de turno, gráficos (Recharts) |
 | `/alunos` | `Students.tsx` | Tabela CRUD com busca, filtros por série/turno |
-| `/alunos/:id` | `StudentProfile.tsx` | Perfil completo com dados pessoais, filiação, contato |
+| `/alunos/:id` | `StudentProfile.tsx` | Perfil completo + histórico de matrícula + impressão de ficha |
 | `/documentos` | `Documents.tsx` | Selecionar aluno + tipo e baixar PDF |
 
 ## Autenticação (`AuthContext.tsx`)
@@ -56,20 +56,18 @@ VITE_API_URL=http://localhost:8000
 - Modo demo: login aceita qualquer credencial, usuário fictício
 - Token JWT injetado via interceptor do Axios
 
-## API — Backend Esperado (`lib/api.ts`)
+## API — Supabase Direto (`lib/api.ts`)
 
-Base URL: `{VITE_API_URL}/api/v1`
+O sistema consulta o Supabase diretamente via client JS, sem backend intermediário.
 
-| Método | Endpoint | Descrição |
+| Tabela | Função | Descrição |
 |---|---|---|
-| GET | `/alunos` | Lista alunos (query: `page`, `limit`, `search`, `serie`) |
-| GET | `/alunos/:id` | Detalhes do aluno |
-| POST | `/alunos` | Criar aluno |
-| PUT | `/alunos/:id` | Atualizar aluno |
-| DELETE | `/alunos/:id` | Excluir aluno |
-| GET | `/dashboard/metrics` | Métricas do dashboard |
-| GET | `/documentos/templates` | Listar templates de documentos |
-| POST | `/documentos/gerar` | Gerar PDF (body: `{ template, aluno_id }`) |
+| `alunos` | `alunosApi.*` | CRUD de alunos |
+| `matriculas` | `matriculasApi.*` | Histórico de matrículas |
+| `dashboard` | `dashboardApi.getMetrics()` | Métricas computadas em memória |
+| `produtos` | `produtosApi.*` | CRUD de produtos |
+| `recibos` | `recibosApi.*` | CRUD de recibos |
+| `templates_documentos` | `templatesApi.*` | CRUD de templates |
 
 ## Estrutura de Arquivos
 
@@ -102,8 +100,9 @@ zenite-app/
     │   ├── setup.ts
     │   └── example.test.ts       # Teste placeholder
     ├── lib/
-    │   ├── api.ts                # Axios instance + tipos + API functions
-    │   ├── supabase.ts           # Supabase client
+    │   ├── api.ts                # Supabase client + tipos + API functions
+    │   ├── masks.ts              # Funções de máscara (CPF, RG, CEP, telefone)
+    │   ├── supabase.ts           # Supabase client init
     │   └── utils.ts              # cn() helper
     ├── contexts/
     │   └── AuthContext.tsx        # Auth provider (Supabase + demo mode)
@@ -131,7 +130,11 @@ zenite-app/
 
 ## Modelo `Aluno` (interface em `lib/api.ts`)
 
-Campos principais: `id`, `nome`, `serie`, `turno`, `situacao`, `datanascimento`, `naturalidade`, `cidade`, `estado`, `valormensalidade`, `datadovencimento`, `nomedopai`, `nomedamae`, `responsavelfinanceiro`, `telefone1-3`, `nometelefone1-3`, `logradouro`, `numero`, `bairro`, `cep`, `cidadetelefone`, `estadotelefone`, `rg`, `cpf`, `nis`, `cia`, `raça`, dados de cartório (`nomedocartorio`, `numerodotermo`, `livro`, `folha`, `matriculadocartorio`), `possuiirmao`, `nomeirmao`, `escola_id`.
+Campos: `id`, `nome`, `serie` (1º–5º Ano), `turno` (Manhã/Tarde/Integral), `genero` (Masculino/Feminino), `status`, `situacao`, `ano_letivo`, `anodamatricula`, `datadamatricula`, `datanascimento`, `naturalidade`, `cidade`, `estado`, `valormensalidade`, `datadovencimento`, `nomedopai`, `rgdopai`, `cpfdopai`, `nomedamae`, `rgmae`, `cpfmae`, `responsavelfinanceiro`, `rgrespfin`, `cpfrespfin`, `datanascimentoresponsavelfin`, `filiacaoresponsavelfin`, `telefone1-3`, `nometelefone1-3`, `logradouro`, `numero`, `complemento`, `bairro`, `cep`, `cidadetelefone`, `estadotelefone`, `rg`, `cpf`, `nis`, `cia`, `raça`, dados de cartório (`nomedocartorio`, `numerodotermo`, `livro`, `folha`, `matriculadocartorio`), `possuiirmao`, `nomeirmao`, `escola_id`, `criado_em`, `atualizado_em`.
+
+## Modelo `Matricula` (interface em `lib/api.ts`)
+
+Campos: `id`, `aluno_id`, `ano_letivo`, `serie`, `turno`, `status` (Ativo/Concluído/Transferido/Cancelado), `data_matricula`, `created_at`.
 
 ## Design System
 
@@ -145,13 +148,14 @@ Campos principais: `id`, `nome`, `serie`, `turno`, `situacao`, `datanascimento`,
 
 ## Observações / Pendências
 
-1. **Backend não existe neste repositório** — o backend deve ser criado separadamente seguindo a especificação da API acima
+1. **Banco de dados Supabase** — o schema deve ser criado manualmente. As migrações não estão versionadas neste repositório.
 2. **GEMINI.md** e **supabase_integration.md** são artefatos de outros projetos/geração automática — **podem ser deletados**
 3. **mockData.ts** tem dados mockados usados exclusivamente na página `Documents.tsx` — o resto do app busca da API real
 4. **Dois sistemas de toast convivem**: o shadcn/ui Toaster e o Sonner — o código usa **sonner** majoritariamente
 5. **Testes**: só tem um placeholder (`example.test.ts`) — sem cobertura real
 6. **Playwright**: configurado mas sem testes escritos
-7. **Página de perfil** (`AppHeader.tsx:94-101`) e **configurações** têm menu dropdown com itens "Perfil" e "Configurações" que não levam a lugar nenhum
-8. **Badge de notificação** no header tem número fixo `3` — sem lógica real
-9. **Documentos** usa mock data (`students` de `mockData.ts`) em vez dos dados da API — possível melhoria: unificar com `alunosApi`
-10. **Valor mensalidade** não é formatado corretamente como moeda na página de documentos (`Documents.tsx:185` usa `selectedStudent.monthlyFee.toFixed(2)` em vez de `formatCurrency`)
+7. **Documentos** usa mock data (`students` de `mockData.ts`) em vez dos dados da API — possível melhoria: unificar com `alunosApi`
+8. **Valor mensalidade** não é formatado corretamente como moeda na página de documentos (`Documents.tsx:185` usa `selectedStudent.monthlyFee.toFixed(2)` em vez de `formatCurrency`)
+9. **Dashboard** — métricas do dashboard (`dashboardApi.getMetrics()`) são computadas em memória a partir de `alunosApi.list()`, não de uma query dedicada
+10. **Gráfico de matrículas** — usa `ano_letivo` da tabela `matriculas`, agrupado por ano (BarChart)
+11. **Ficha do Aluno** — PDF gerado via `gerarFichaAlunoPDF()` com dados pessoais + histórico de matrícula

@@ -90,6 +90,8 @@ export default function Students() {
   const handleSave = () => {
     setEditingStudent(null);
     queryClient.invalidateQueries({ queryKey: ["alunos"] });
+    queryClient.invalidateQueries({ queryKey: ["matriculas"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboard-metrics"] });
   };
 
   const handleDelete = (id: string) => {

@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { Users, GraduationCap, Sun, TrendingUp, ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { dashboardApi, alunosApi } from "@/lib/api";
+import { dashboardApi, alunosApi, matriculasApi, Matricula } from "@/lib/api";
 import {
   BarChart,
   Bar,
@@ -11,8 +12,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Area,
-  AreaChart,
   Legend,
 } from "recharts";
 import { Loader2 } from "lucide-react";
@@ -21,41 +20,51 @@ export default function Dashboard() {
   const { data: metrics, isLoading, error } = useQuery({
     queryKey: ["dashboard-metrics"],
     queryFn: () => dashboardApi.getMetrics(),
+    refetchOnMount: "always",
   });
 
   const { data: alunosData } = useQuery({
     queryKey: ["alunos", "all"],
-    queryFn: () => alunosApi.list({ limit: 100 }),
+    queryFn: () => alunosApi.list({ limit: 1000 }),
+    refetchOnMount: "always",
   });
+
+  const { data: matriculas = [] } = useQuery({
+    queryKey: ["matriculas", "all"],
+    queryFn: () => matriculasApi.listAll(),
+    refetchOnMount: "always",
+  });
+
+  const enrollmentByYear = useMemo(() => {
+    const years = ["2023", "2024", "2025", "2026"];
+    const data = years.map((year) => ({ name: year, total: 0 }));
+    (matriculas as Matricula[]).forEach((m) => {
+      if (m.status !== "Ativo" && m.status !== "Concluído") return;
+      const yearStr = m.ano_letivo?.toString();
+      if (yearStr && years.includes(yearStr)) {
+        const entry = data.find((d) => d.name === yearStr);
+        if (entry) entry.total += 1;
+      }
+    });
+    return data;
+  }, [matriculas]);
 
   const students = alunosData?.items || [];
   const activeStudents = metrics?.total_alunos_ativos || 0;
   const morningCount = metrics?.alunos_manhã || 0;
   const afternoonCount = metrics?.alunos_tarde || 0;
 
-  const gradeDistribution = metrics?.por_serie || [];
-
-  const enrollmentsByMonth = [
-    { month: "Jan", count: 12 },
-    { month: "Fev", count: 18 },
-    { month: "Mar", count: 25 },
-    { month: "Abr", count: 8 },
-    { month: "Mai", count: 5 },
-    { month: "Jun", count: 3 },
-    { month: "Jul", count: 2 },
-    { month: "Ago", count: 7 },
-    { month: "Set", count: 4 },
-    { month: "Out", count: 6 },
-    { month: "Nov", count: 3 },
-    { month: "Dez", count: 1 },
-  ];
-
-  const totalEnrollments = enrollmentsByMonth.reduce((sum, month) => sum + month.count, 0);
-  const avgEnrollments = Math.round(totalEnrollments / enrollmentsByMonth.length);
-
   const seriesOrder = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"];
-  const turnosOrder = ["Manhã", "Tarde", "Integral"];
   const turnoLabel: Record<string, string> = { "Manhã": "M", "Tarde": "T", "Integral": "I" };
+
+  const gradeDistribution = (metrics?.por_serie || []).sort(
+    (a, b) => seriesOrder.indexOf(a.serie) - seriesOrder.indexOf(b.serie)
+  );
+
+  const totalEnrollments = enrollmentByYear.reduce((sum, m) => sum + m.total, 0);
+  const avgEnrollments = Math.round(totalEnrollments / enrollmentByYear.length);
+
+  const turnosOrder = ["Manhã", "Tarde", "Integral"];
 
   const genderBySerieTurno = seriesOrder.flatMap((serie) =>
     turnosOrder.map((turno) => {
@@ -142,7 +151,7 @@ export default function Dashboard() {
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground">
-              Média de {avgEnrollments} por mês
+              Média de {avgEnrollments} por ano
             </p>
           </CardContent>
         </Card>
@@ -208,30 +217,21 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-semibold text-foreground">
-                  Matrículas por Mês
+                  Evolução de Matrículas
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Crescimento ao longo do ano
+                  Total de alunos por ano letivo
                 </p>
               </div>
-              <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20">
-                2024
-              </Badge>
             </div>
           </CardHeader>
           <CardContent className="pt-6">
             <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={enrollmentsByMonth}>
-                <defs>
-                  <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(156, 43%, 13%)" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(156, 43%, 13%)" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
+              <BarChart data={enrollmentByYear}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(150, 12%, 88%)" vertical={false} />
                 <XAxis
-                  dataKey="month"
-                  tick={{ fontSize: 12, fill: "hsl(156, 10%, 42%)" }}
+                  dataKey="name"
+                  tick={{ fontSize: 14, fontWeight: 600, fill: "hsl(156, 10%, 42%)" }}
                   axisLine={false}
                   tickLine={false}
                 />
@@ -239,6 +239,7 @@ export default function Dashboard() {
                   tick={{ fontSize: 12, fill: "hsl(156, 10%, 42%)" }}
                   axisLine={false}
                   tickLine={false}
+                  allowDecimals={false}
                 />
                 <Tooltip
                   contentStyle={{
@@ -248,16 +249,10 @@ export default function Dashboard() {
                     backgroundColor: "hsl(0, 0%, 100%)",
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                   }}
+                  formatter={(value: number) => [value, "Alunos"]}
                 />
-                <Area
-                  type="monotone"
-                  dataKey="count"
-                  stroke="hsl(156, 43%, 13%)"
-                  strokeWidth={3}
-                  fill="url(#colorCount)"
-                  name="Matrículas"
-                />
-              </AreaChart>
+                <Bar dataKey="total" fill="#3B82F6" name="Matrículas" radius={[6, 6, 0, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
@@ -356,37 +351,21 @@ export default function Dashboard() {
                   ]}
                 />
                 <Legend
-                  formatter={(value: string) => (value === "masculino" ? "Meninos" : "Meninas")}
+                  formatter={(value: string) => value === "masculino" ? "Meninos" : "Meninas"}
                 />
                 <Bar
                   stackId="a"
                   dataKey="masculino"
                   fill="#3B82F6"
                   name="masculino"
-                  radius={[0, 0, 0, 0]}
-                  label={({ value, x, y, width, height }) => {
-                    if (value === 0) return null;
-                    return (
-                      <text x={x + width / 2} y={y + height / 2} textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize={11} fontWeight={600}>
-                        {value}
-                      </text>
-                    );
-                  }}
+                  radius={[4, 4, 0, 0]}
                 />
                 <Bar
                   stackId="a"
                   dataKey="feminino"
                   fill="#EC4899"
                   name="feminino"
-                  radius={[0, 0, 0, 0]}
-                  label={({ value, x, y, width, height }) => {
-                    if (value === 0) return null;
-                    return (
-                      <text x={x + width / 2} y={y + height / 2} textAnchor="middle" dominantBaseline="middle" fill="#fff" fontSize={11} fontWeight={600}>
-                        {value}
-                      </text>
-                    );
-                  }}
+                  radius={[4, 4, 0, 0]}
                 />
               </BarChart>
             </ResponsiveContainer>
