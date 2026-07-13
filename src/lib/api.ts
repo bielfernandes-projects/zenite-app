@@ -221,6 +221,25 @@ export const matriculasApi = {
     if (error) throw error;
     return data as Matricula;
   },
+
+  update: async (id: string, updates: Partial<Pick<Matricula, "ano_letivo" | "serie" | "turno" | "status" | "data_matricula">>) => {
+    const { data, error } = await supabase
+      .from("matriculas")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data as Matricula;
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase
+      .from("matriculas")
+      .delete()
+      .eq("id", id);
+    if (error) throw error;
+  },
 };
 
 export function getMatriculaAtiva(aluno: AlunoComMatriculas | Aluno): Matricula | null {
@@ -698,3 +717,72 @@ export async function gerarFichaAlunoPDF(aluno: Aluno, matriculas: Matricula[]):
 
   return doc.output("blob");
 }
+
+export interface Profile {
+  id: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  updated_at: string;
+}
+
+export const profileApi = {
+  get: async (userId: string) => {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      const { data: inserted } = await supabase
+        .from("profiles")
+        .insert({ id: userId, display_name: "" })
+        .select()
+        .single();
+      return inserted as Profile;
+    }
+    return data as Profile;
+  },
+
+  update: async (userId: string, updates: Partial<Pick<Profile, "display_name">>) => {
+    const { data: existing } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("id", userId)
+      .maybeSingle();
+    if (existing) {
+      const { data, error } = await supabase
+        .from("profiles")
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq("id", userId)
+        .select()
+        .single();
+      if (error) throw error;
+      return data as Profile;
+    } else {
+      const { data, error } = await supabase
+        .from("profiles")
+        .insert({ id: userId, ...updates, updated_at: new Date().toISOString() })
+        .select()
+        .single();
+      if (error) throw error;
+      return data as Profile;
+    }
+  },
+
+  uploadAvatar: async (userId: string, file: File) => {
+    const filePath = `${userId}/${Date.now()}_${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file, { upsert: true });
+    if (uploadError) throw uploadError;
+    const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+    const publicUrl = urlData.publicUrl;
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
+      .eq("id", userId);
+    if (updateError) throw updateError;
+    return publicUrl;
+  },
+};

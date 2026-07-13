@@ -37,6 +37,16 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { alunosApi, matriculasApi, gerarFichaAlunoPDF, AlunoComMatriculas, Matricula } from "@/lib/api";
 import { toast } from "sonner";
 import { StudentForm } from "@/components/StudentForm";
@@ -65,6 +75,8 @@ export default function StudentProfile() {
   const queryClient = useQueryClient();
   const [formOpen, setFormOpen] = useState(false);
   const [matriculaDialogOpen, setMatriculaDialogOpen] = useState(false);
+  const [editingMatricula, setEditingMatricula] = useState<Matricula | null>(null);
+  const [deletingMatriculaId, setDeletingMatriculaId] = useState<string | null>(null);
   const [tabValue, setTabValue] = useState("personal");
 
   const { data: student, isLoading, error } = useQuery({
@@ -120,17 +132,56 @@ export default function StudentProfile() {
     },
   });
 
+  const updateMatriculaMutation = useMutation({
+    mutationFn: ({ id: matId, data }: { id: string; data: MatriculaFormData }) =>
+      matriculasApi.update(matId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["matriculas", id] });
+      queryClient.invalidateQueries({ queryKey: ["aluno", id] });
+      toast.success("Matrícula atualizada com sucesso!");
+      setMatriculaDialogOpen(false);
+      setEditingMatricula(null);
+      matriculaForm.reset();
+    },
+    onError: () => {
+      toast.error("Erro ao atualizar matrícula. Tente novamente.");
+    },
+  });
+
+  const deleteMatriculaMutation = useMutation({
+    mutationFn: (matId: string) => matriculasApi.delete(matId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["matriculas", id] });
+      queryClient.invalidateQueries({ queryKey: ["aluno", id] });
+      toast.success("Matrícula excluída com sucesso!");
+      setDeletingMatriculaId(null);
+    },
+    onError: () => {
+      toast.error("Erro ao excluir matrícula. Tente novamente.");
+    },
+  });
+
   useEffect(() => {
     if (matriculaDialogOpen) {
-      matriculaForm.reset({
-        ano_letivo: new Date().getFullYear(),
-        serie: "",
-        turno: "",
-        status: "Ativo",
-        data_matricula: new Date().toISOString().split("T")[0],
-      });
+      if (editingMatricula) {
+        matriculaForm.reset({
+          ano_letivo: editingMatricula.ano_letivo,
+          serie: editingMatricula.serie,
+          turno: editingMatricula.turno,
+          status: editingMatricula.status,
+          data_matricula: editingMatricula.data_matricula || new Date().toISOString().split("T")[0],
+        });
+      } else {
+        matriculaForm.reset({
+          ano_letivo: new Date().getFullYear(),
+          serie: "",
+          turno: "",
+          status: "Ativo",
+          data_matricula: new Date().toISOString().split("T")[0],
+        });
+      }
     }
-  }, [matriculaDialogOpen, matriculaForm]);
+  }, [matriculaDialogOpen, editingMatricula, matriculaForm]);
 
   const formatCurrency = (value?: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
@@ -147,7 +198,11 @@ export default function StudentProfile() {
   };
 
   const onSubmitMatricula = (data: MatriculaFormData) => {
-    createMatriculaMutation.mutate(data);
+    if (editingMatricula) {
+      updateMatriculaMutation.mutate({ id: editingMatricula.id, data });
+    } else {
+      createMatriculaMutation.mutate(data);
+    }
   };
 
   const handlePrintFicha = async () => {
@@ -489,30 +544,53 @@ export default function StudentProfile() {
                       <TableHead className="text-xs">Turno</TableHead>
                       <TableHead className="text-xs">Data da Matrícula</TableHead>
                       <TableHead className="text-xs">Status</TableHead>
+                      <TableHead className="text-xs w-20">Ações</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(() => {
-                      const matriculaBySerie = new Map(matriculas.map((m) => [m.serie, m]));
-                      return grades.map((grade) => {
-                        const m = matriculaBySerie.get(grade);
-                        return (
-                          <TableRow key={grade}>
-                            <TableCell className="font-medium">{grade}</TableCell>
-                            <TableCell>{m?.ano_letivo ?? ""}</TableCell>
-                            <TableCell>{m?.turno ?? ""}</TableCell>
-                            <TableCell>{m?.data_matricula ? formatDate(m.data_matricula) : ""}</TableCell>
-                            <TableCell>
-                              {m?.status ? (
-                                <Badge variant="outline" className={getStatusBadgeColor(m.status)}>
-                                  {m.status}
-                                </Badge>
-                              ) : ""}
-                            </TableCell>
-                          </TableRow>
-                        );
-                      });
-                    })()}
+                    {matriculas.map((m) => (
+                      <TableRow key={m.id}>
+                        <TableCell className="font-medium">{m.serie}</TableCell>
+                        <TableCell>{m.ano_letivo}</TableCell>
+                        <TableCell>{m.turno}</TableCell>
+                        <TableCell>{m.data_matricula ? formatDate(m.data_matricula) : "—"}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={getStatusBadgeColor(m.status)}>
+                            {m.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => {
+                                setEditingMatricula(m);
+                                setMatriculaDialogOpen(true);
+                              }}
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                              onClick={() => setDeletingMatriculaId(m.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {matriculas.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          Nenhuma matrícula cadastrada.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               )}
@@ -521,13 +599,16 @@ export default function StudentProfile() {
         </TabsContent>
       </Tabs>
 
-      {/* Nova Matrícula Dialog */}
-      <Dialog open={matriculaDialogOpen} onOpenChange={setMatriculaDialogOpen}>
+      {/* Nova/Editar Matrícula Dialog */}
+      <Dialog open={matriculaDialogOpen} onOpenChange={(open) => {
+        setMatriculaDialogOpen(open);
+        if (!open) setEditingMatricula(null);
+      }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Nova Matrícula</DialogTitle>
+            <DialogTitle>{editingMatricula ? "Editar Matrícula" : "Nova Matrícula"}</DialogTitle>
             <DialogDescription>
-              Cadastre uma nova matrícula para {student.nome}.
+              {editingMatricula ? "Altere os dados da matrícula." : `Cadastre uma nova matrícula para ${student.nome}.`}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={matriculaForm.handleSubmit(onSubmitMatricula)} className="space-y-4">
@@ -624,8 +705,8 @@ export default function StudentProfile() {
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createMatriculaMutation.isPending}>
-                {createMatriculaMutation.isPending ? (
+              <Button type="submit" disabled={createMatriculaMutation.isPending || updateMatriculaMutation.isPending}>
+                {(createMatriculaMutation.isPending || updateMatriculaMutation.isPending) ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Salvando...
@@ -638,6 +719,29 @@ export default function StudentProfile() {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deletingMatriculaId} onOpenChange={(open) => { if (!open) setDeletingMatriculaId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir matrícula?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. A matrícula será removida permanentemente do histórico do aluno.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deletingMatriculaId && deleteMatriculaMutation.mutate(deletingMatriculaId)}
+            >
+              {deleteMatriculaMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <StudentForm
         open={formOpen}

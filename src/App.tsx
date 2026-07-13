@@ -12,6 +12,8 @@ import Documents from "./pages/Documents";
 import StudentProfile from "./pages/StudentProfile";
 import Products from "./pages/Products";
 import Sales from "./pages/Sales";
+import ImportStudents from "./pages/ImportStudents";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 
@@ -31,6 +33,8 @@ function AppRoutes() {
                 <Route path="/alunos" element={<Students />} />
                 <Route path="/alunos/:id" element={<StudentProfile />} />
                 <Route path="/documentos" element={<Documents />} />
+                <Route path="/importar" element={<ImportStudents />} />
+                <Route path="/perfil" element={<Profile />} />
                 <Route path="/financeiro/produtos" element={<Products />} />
                 <Route path="/financeiro/vendas" element={<Sales />} />
                 <Route path="*" element={<NotFound />} />

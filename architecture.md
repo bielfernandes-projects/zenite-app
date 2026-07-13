@@ -1,4 +1,4 @@
-# Zênite — Arquitetura do Sistema
+# I. I. Tia Neuma — Arquitetura do Sistema
 
 > Sistema de Gestão Escolar — Instituto Infantil Tia Neuma
 
@@ -21,6 +21,7 @@ Frontend SPA (Single Page Application) que se conecta diretamente ao Supabase (P
 | Ícones | Lucide React | — |
 | Gráficos | Recharts | 2.x |
 | PDF | jsPDF + jsPDF-AutoTable | 4.x |
+| Importação .docx | JSZip | 3.x |
 | Banco de Dados | Supabase (PostgreSQL) | — |
 | Testes Unitários | Vitest | 3.x |
 | Testes E2E | Playwright | 1.x |
@@ -40,34 +41,34 @@ VITE_API_URL=http://localhost:8081
 
 ```
 zenite-app/
-├── .env                          # Credenciais Supabase + API URL
+├── .env                          # Credenciais Supabase
 ├── .gitignore
 ├── components.json               # Config shadcn/ui
 ├── eslint.config.js
-├── index.html                    # Entry HTML
+├── index.html                    # Entry HTML (título: "Zenite - I. I. Tia Neuma")
 ├── package.json                  # Dependências
 ├── bun.lock                      # Lockfile do Bun
 ├── vite.config.ts                # Config Vite (porta 8080, alias @/)
 ├── vitest.config.ts              # Config Vitest
 ├── playwright.config.ts          # Config Playwright
-├── tailwind.config.ts            # Tema verde-escuro + sidebar
+├── tailwind.config.ts            # Tema com cores navy+orange + sidebar
 ├── postcss.config.js             # PostCSS
 ├── tsconfig.json                 # TypeScript base
 ├── tsconfig.app.json             # TypeScript app
 ├── tsconfig.node.json            # TypeScript node
 ├── arquivos-modelo/              # Fichas de modelo (.docx)
-├── public/                       # Assets estáticos (robots.txt)
+├── public/                       # Assets estáticos (logo.png)
 ├── src/
 │   ├── main.tsx                  # Entry point React
 │   ├── App.tsx                   # Provider tree + rotas
-│   ├── index.css                 # CSS custom (tema, variáveis, animações)
+│   ├── index.css                 # CSS custom (tema navy/orange, variáveis, animações)
 │   ├── vite-env.d.ts             # Declarações de tipos Vite
 │   ├── contexts/
 │   │   └── AuthContext.tsx        # Auth provider (Supabase Auth)
 │   ├── components/
 │   │   ├── AppLayout.tsx         # Layout principal (Sidebar + Header + main)
-│   │   ├── AppSidebar.tsx        # Sidebar colapsável com navegação
-│   │   ├── AppHeader.tsx         # Header com breadcrumb + user menu
+│   │   ├── AppSidebar.tsx        # Sidebar sempre colapsada (48px), sem toggle
+│   │   ├── AppHeader.tsx         # Header: logo + "I. I. Tia Neuma" + breadcrumbs + avatar
 │   │   ├── NavLink.tsx           # Wrapper do React Router NavLink
 │   │   ├── ProtectedRoute.tsx    # Redirect p/ /login se não autenticado
 │   │   ├── StudentForm.tsx       # Sheet lateral com 4 abas de cadastro
@@ -76,18 +77,23 @@ zenite-app/
 │   │   ├── use-toast.ts          # Toast hook (shadcn)
 │   │   └── use-mobile.tsx        # Mobile breakpoint hook
 │   ├── lib/
-│   │   ├── api.ts                # Supabase client + interfaces + API functions
+│   │   ├── api.ts                # Supabase client + interfaces + API (alunos, matrículas, dashboard, templates, produtos, recibos, profile)
 │   │   ├── masks.ts              # Funções de máscara (CPF, RG, CEP, telefone)
 │   │   ├── supabase.ts           # Supabase client init
+│   │   ├── assets.ts             # Logo e imagens em base64
+│   │   ├── docxParser.ts         # Parser de .docx via JSZip
+│   │   ├── profileApi.ts         # API de perfis de usuário (avatar, display_name, senha)
 │   │   └── utils.ts              # cn() helper (classnames)
 │   └── pages/
 │       ├── Login.tsx             # Tela de login com gradiente
 │       ├── Dashboard.tsx         # Métricas + cards + gráfico de barras
-│       ├── Students.tsx          # Tabela CRUD de alunos
-│       ├── StudentProfile.tsx    # Perfil detalhado do aluno
+│       ├── Students.tsx          # Tabela CRUD com filtros multi-select e ordenação
+│       ├── StudentProfile.tsx    # Perfil detalhado + CRUD de matrículas
+│       ├── ImportStudents.tsx    # Importação de .docx com drag-and-drop
 │       ├── Documents.tsx         # Templates + geração de PDF
 │       ├── Products.tsx          # CRUD de produtos
 │       ├── Sales.tsx             # Vendas + recibos
+│       ├── Profile.tsx           # Perfil do usuário logado (nome, senha, avatar)
 │       └── NotFound.tsx          # Página 404
 ```
 
@@ -96,12 +102,14 @@ zenite-app/
 | Path | Componente | Descrição |
 |---|---|---|
 | `/login` | `Login.tsx` | Autenticação via Supabase Auth |
-| `/` | `Dashboard.tsx` | Métricas, cards de turno, gráfico de matrículas por série |
-| `/alunos` | `Students.tsx` | Tabela CRUD com busca, filtros por série/turno, PDF de lista |
-| `/alunos/:id` | `StudentProfile.tsx` | Perfil completo + histórico de matrícula + impressão de ficha |
+| `/` | `Dashboard.tsx` | Métricas, cards de turno, gráfico de matrículas por série e gênero |
+| `/alunos` | `Students.tsx` | Tabela CRUD com filtros multi-select, ordenação, PDF lista filtrada |
+| `/alunos/:id` | `StudentProfile.tsx` | Perfil completo + CRUD de matrículas + impressão de ficha |
+| `/importar` | `ImportStudents.tsx` | Importação de alunos via .docx com drag-and-drop |
 | `/documentos` | `Documents.tsx` | Criar/editar templates + gerar PDFs com tags dinâmicas |
 | `/financeiro/produtos` | `Products.tsx` | CRUD de produtos (fardamento, material, taxa) |
 | `/financeiro/vendas` | `Sales.tsx` | Vendas com busca de aluno, seleção de itens, geração de recibo PDF |
+| `/perfil` | `Profile.tsx` | Perfil do usuário: nome, senha, avatar |
 | `*` | `NotFound.tsx` | Página 404 |
 
 ## Banco de Dados (Supabase)
@@ -222,6 +230,18 @@ Recibos de pagamento gerados.
 | `itens` | jsonb | Array de `{ nome, preco, quantidade, subtotal }` |
 | `valor_total` | numeric | Valor total do recibo |
 
+#### `profiles`
+
+Perfis de usuário (auto-criados no signup via trigger).
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `id` | uuid | FK → auth.users.id |
+| `display_name` | text | Nome de exibição |
+| `avatar_url` | text | URL do avatar (Supabase Storage) |
+| `created_at` | timestamp | Data de criação |
+| `updated_at` | timestamp | Data de atualização |
+
 ## API (Frontend → Supabase)
 
 Todas as funções ficam em `src/lib/api.ts` e usam o client Supabase JS diretamente.
@@ -242,6 +262,8 @@ alunosApi.delete(id)             // Remove aluno
 matriculasApi.listAll()          // Lista todas as matrículas
 matriculasApi.list(alunoId)      // Matrículas de um aluno (por ano decrescente)
 matriculasApi.create(matricula)  // Insere nova matrícula
+matriculasApi.update(id, data)   // Atualiza matrícula
+matriculasApi.delete(id)         // Remove matrícula
 ```
 
 ### `dashboardApi`
@@ -279,6 +301,16 @@ templatesApi.update(id, data)    // Atualiza template
 templatesApi.delete(id)          // Remove template
 ```
 
+### `profileApi`
+
+API de perfis de usuário (arquivo separado: `src/lib/profileApi.ts`).
+
+```typescript
+profileApi.get(userId)                  // Busca profile por user_id (cria se não existir)
+profileApi.update(userId, data)         // Atualiza display_name, sobrescreve senha via Supabase Auth
+profileApi.uploadAvatar(userId, file)   // Upload de avatar para Supabase Storage (bucket "avatars")
+```
+
 ### Funções Auxiliares
 
 ```typescript
@@ -287,6 +319,8 @@ getMatriculaAtiva(aluno)                            // Retorna matrícula ativa 
 gerarDocumentoPDF(titulo, corpo, tituloImpresso?, requerAssinatura?)  // Gera PDF de documento
 gerarFichaAlunoPDF(aluno, matriculas)               // Gera PDF da ficha do aluno
 formatarDataExtenso()                               // "Fortaleza, 13 de julho de 2026"
+formatarMoeda(valor)                                // "R$ 1.200,00"
+formatarCPF(cpf)                                    // "000.000.000-00"
 ```
 
 ## Autenticação
@@ -295,6 +329,8 @@ formatarDataExtenso()                               // "Fortaleza, 13 de julho d
 - **Modo demo:** Ativado quando `VITE_SUPABASE_URL` não está configurada — aceita qualquer credencial
 - **Fluxo:** `Login.tsx` → `signIn()` → `AuthContext` → `ProtectedRoute` → rotas protegidas
 - **Token:** JWT injetado automaticamente via client Supabase
+- **Perfis:** Tabela `profiles` vinculada a auth.users, auto-criada via trigger no signup
+- **Avatar:** Bucket `avatars` no Supabase Storage
 
 ### Usuários Cadastrados
 
@@ -346,13 +382,23 @@ Funcionam combinadas e em qualquer parte do texto. A formatação é renderizada
 
 | Elemento | Cor | CSS Variable |
 |---|---|---|
-| Primária | Verde floresta escuro `#152B21` | `--primary` |
-| Sidebar | Tom mais escuro da primária | `--sidebar-background` |
+| Primária | Navy blue `#01182C` | `--primary` |
+| Accent | Orange `#EF7F2D` | `--accent` |
+| Sidebar | Navy blue uniforme `#01182C` | `--sidebar-background` |
+| Sidebar Hover | Orange `#EF7F2D` | `--sidebar-accent` |
 | Background | Fundo claro com mesh gradient sutil | `--background` |
 | Cards | Brancos com sombra | `--card` |
 | Sucesso | Verde | `--success` |
 | Aviso | Amarelo | `--warning` |
 | Destrutivo | Vermelho | `--destructive` |
+
+### Branding
+
+- **Nome:** I. I. Tia Neuma (Instituto Infantil Tia Neuma)
+- **Logo:** `public/logo.png` (aparece no header)
+- **Título da página:** "Zenite - I. I. Tia Neuma"
+- **Sidebar:** Sempre colapsada (48px), sem botão toggle, fundo uniforme navy, ícones centralizados verticalmente, hover laranja
+- **Header:** `[logo.png] I. I. Tia Neuma | [breadcrumbs] | [avatar + display_name/email dropdown]`
 
 ### Tipografia
 
@@ -362,7 +408,7 @@ Funcionam combinadas e em qualquer parte do texto. A formatação é renderizada
 ### Componentes
 
 - **shadcn/ui** (Radix UI) — ~60 componentes na pasta `src/components/ui/`
-- **Sidebar colapsável** — modo ícone-only ou expandido
+- **Sidebar sempre colapsada** — largura fixa 48px, sem toggle, sem atalho Ctrl+B
 - **Dark mode** suportado via CSS variables (classe `.dark`)
 
 ### Animações
@@ -406,9 +452,13 @@ bun preview       # Preview da build de produção
 
 ## Observações e Pendências
 
-1. **Schema do Supabase** — as migrações não estão versionadas no repositório; foram criadas manualmente no painel do Supabase
+1. **Schema do Supabase** — migrações versionadas em `supabase/migrations/`; a última cria a tabela `profiles`
 2. **Testes** — apenas placeholder; sem cobertura real
 3. **Playwright** — configurado mas sem testes E2E escritos
 4. **Dois sistemas de toast** — shadcn/ui Toaster e Sonner coexistem; o código usa Sonner majoritariamente
 5. **Dashboard** — métricas computadas em memória a partir de `alunosApi.list()`, não de query dedicada no banco
-6. **Valor mensalidade** — em `Documents.tsx`, o campo de documentos usa `.toFixed(2)` em vez de `formatCurrency`
+6. **Students.tsx** — filtros multi-select (série, turno, status) + ordenação por coluna; PDF gera lista filtrada
+7. **Matrícula CRUD** —StudentProfile.tsx tem edição e exclusão de matrículas via dialog e AlertDialog
+8. **Importação .docx** — módulo completo com drag-and-drop, parser regex, 4 abas de edição e vínculo automático de matrícula
+9. **Sidebar** — sempre colapsada (48px), sem toggle, hover laranja, ícones centralizados verticalmente
+10. **Branding** — cores navy #01182C + orange #EF7F2D, logo no header, título "I. I. Tia Neuma"

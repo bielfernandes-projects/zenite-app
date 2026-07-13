@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { Users, GraduationCap, Sun, TrendingUp, ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { dashboardApi, alunosApi, matriculasApi, Matricula } from "@/lib/api";
+import { dashboardApi, alunosApi, matriculasApi, Matricula, AlunoComMatriculas, getMatriculaAtiva } from "@/lib/api";
 import {
   BarChart,
   Bar,
@@ -49,7 +49,7 @@ export default function Dashboard() {
     return data;
   }, [matriculas]);
 
-  const students = alunosData?.items || [];
+  const students = (alunosData?.items || []) as AlunoComMatriculas[];
   const activeStudents = metrics?.total_alunos_ativos || 0;
   const morningCount = metrics?.alunos_manhã || 0;
   const afternoonCount = metrics?.alunos_tarde || 0;
@@ -68,7 +68,10 @@ export default function Dashboard() {
 
   const genderBySerieTurno = seriesOrder.flatMap((serie) =>
     turnosOrder.map((turno) => {
-      const alunos = students.filter((s) => s.serie === serie && s.turno === turno);
+      const alunos = students.filter((s) => {
+        const mat = getMatriculaAtiva(s);
+        return (mat?.serie || s.serie) === serie && (mat?.turno || s.turno) === turno;
+      });
       const masculino = alunos.filter((s) => s.genero === "Masculino").length;
       const feminino = alunos.filter((s) => s.genero === "Feminino").length;
       return {

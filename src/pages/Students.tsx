@@ -1,10 +1,12 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Plus, MoreHorizontal, Pencil, Trash2, Loader2, FileDown, List } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Pencil, Trash2, Loader2, FileDown, List, X, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -49,10 +51,12 @@ export default function Students() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [gradeFilter, setGradeFilter] = useState("all");
-  const [shiftFilter, setShiftFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  const [selectedShifts, setSelectedShifts] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(["Ativo"]);
   const [formOpen, setFormOpen] = useState(false);
+  const [sortColumn, setSortColumn] = useState<"nome" | "status" | "serie" | "turno">("nome");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [editingStudent, setEditingStudent] = useState<Aluno | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [serieDialogOpen, setSerieDialogOpen] = useState(false);
@@ -81,11 +85,42 @@ export default function Students() {
 
   const filtered = alunos.filter((s) => {
     const matriculaAtiva = getMatriculaAtiva(s);
-    const matchShift = shiftFilter === "all" || (matriculaAtiva?.turno || s.turno) === shiftFilter;
-    const matchStatus = statusFilter === "all" || (s.status || s.situacao) === statusFilter;
-    const matchGrade = gradeFilter === "all" || (matriculaAtiva?.serie || s.serie) === gradeFilter;
+    const matchShift = selectedShifts.length === 0 || selectedShifts.includes(matriculaAtiva?.turno || s.turno || "");
+    const matchStatus = selectedStatuses.length === 0 || selectedStatuses.includes(s.status || s.situacao || "");
+    const matchGrade = selectedGrades.length === 0 || selectedGrades.includes(matriculaAtiva?.serie || s.serie || "");
     return matchShift && matchStatus && matchGrade;
   });
+
+  const handleSort = (column: "nome" | "status" | "serie" | "turno") => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      setSortColumn(column);
+      setSortDirection("asc");
+    }
+  };
+
+  const filteredAndSorted = [...filtered].sort((a, b) => {
+    const matA = getMatriculaAtiva(a);
+    const matB = getMatriculaAtiva(b);
+    let valA: string;
+    let valB: string;
+    switch (sortColumn) {
+      case "nome": valA = a.nome || ""; valB = b.nome || ""; break;
+      case "status": valA = a.status || a.situacao || ""; valB = b.status || b.situacao || ""; break;
+      case "serie": valA = matA?.serie || a.serie || ""; valB = matB?.serie || b.serie || ""; break;
+      case "turno": valA = matA?.turno || a.turno || ""; valB = matB?.turno || b.turno || ""; break;
+      default: valA = ""; valB = "";
+    }
+    return sortDirection === "asc" ? valA.localeCompare(valB) : valB.localeCompare(valA);
+  });
+
+  const SortIcon = ({ column }: { column: "nome" | "status" | "serie" | "turno" }) => {
+    if (sortColumn !== column) return <ArrowUpDown className="h-3 w-3 ml-1 text-muted-foreground" />;
+    return sortDirection === "asc"
+      ? <ArrowUp className="h-3 w-3 ml-1 text-foreground" />
+      : <ArrowDown className="h-3 w-3 ml-1 text-foreground" />;
+  };
 
   const handleSave = () => {
     setEditingStudent(null);
@@ -96,6 +131,19 @@ export default function Students() {
 
   const handleDelete = (id: string) => {
     deleteMutation.mutate(id);
+  };
+
+  const toggleArrayFilter = (arr: string[], setArr: (v: string[]) => void, value: string) => {
+    setArr(arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value]);
+  };
+
+  const hasActiveFilters = selectedGrades.length > 0 || selectedShifts.length > 0 || selectedStatuses.length > 1 || search.length > 0 || (selectedStatuses.length === 1 && selectedStatuses[0] !== "Ativo");
+
+  const clearFilters = () => {
+    setSelectedGrades([]);
+    setSelectedShifts([]);
+    setSelectedStatuses(["Ativo"]);
+    setSearch("");
   };
 
   const generatePDF = useCallback(async (students: Aluno[], title: string) => {
@@ -158,7 +206,7 @@ export default function Students() {
     }
   }, []);
 
-  const handleGeral = () => generatePDF(filtered, "Alunos Matriculados");
+  const handleGeral = () => generatePDF(filtered, "Alunos Filtrados");
   const handleMasculina = () => {
     const filteredByGender = filtered.filter((s) => s.genero === "Masculino");
     if (filteredByGender.length === 0) {
@@ -214,7 +262,7 @@ export default function Students() {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem onClick={handleGeral}>
                 <List className="mr-2 h-4 w-4" />
-                Alunos Matriculados (Geral)
+                Alunos Filtrados
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleMasculina}>
                 <List className="mr-2 h-4 w-4" />
@@ -243,6 +291,78 @@ export default function Students() {
         </div>
       </div>
 
+      <Card className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-foreground">Filtrar alunos</h3>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-7 text-xs gap-1">
+              <X className="h-3 w-3" />
+              Limpar filtros
+            </Button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+          <div>
+            <Label className="text-xs font-medium text-muted-foreground mb-2 block">Nome</Label>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="h-9 pl-7 text-sm"
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs font-medium text-muted-foreground mb-2 block">Série</Label>
+            <div className="space-y-1.5">
+              {grades.map((g) => (
+                <label key={g} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={selectedGrades.includes(g)}
+                    onCheckedChange={() => toggleArrayFilter(selectedGrades, setSelectedGrades, g)}
+                  />
+                  {g}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs font-medium text-muted-foreground mb-2 block">Turno</Label>
+            <div className="space-y-1.5">
+              {shifts.map((s) => (
+                <label key={s} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={selectedShifts.includes(s)}
+                    onCheckedChange={() => toggleArrayFilter(selectedShifts, setSelectedShifts, s)}
+                  />
+                  {s}
+                </label>
+              ))}
+            </div>
+          </div>
+          <div>
+            <Label className="text-xs font-medium text-muted-foreground mb-2 block">Status</Label>
+            <div className="space-y-1.5">
+              {["Ativo", "Inativo"].map((s) => (
+                <label key={s} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox
+                    checked={selectedStatuses.includes(s)}
+                    onCheckedChange={() => toggleArrayFilter(selectedStatuses, setSelectedStatuses, s)}
+                  />
+                  {s}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground mt-4">
+          {filtered.length} aluno(s) encontrado(s)
+          {hasActiveFilters && ` de ${alunos.length}`}
+        </p>
+      </Card>
+
       <Card className="shadow-sm rounded-xl overflow-hidden">
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
@@ -257,53 +377,24 @@ export default function Students() {
             <TableHeader>
               <TableRow className="bg-muted/30">
                 <TableHead>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input
-                      placeholder="Nome..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="h-8 pl-7 text-xs rounded-md"
-                    />
-                  </div>
+                  <button onClick={() => handleSort("nome")} className="flex items-center hover:text-foreground transition-colors">
+                    Nome <SortIcon column="nome" />
+                  </button>
                 </TableHead>
                 <TableHead>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="h-8 text-xs rounded-md">
-                      <SelectValue placeholder="Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="Ativo">Ativo</SelectItem>
-                      <SelectItem value="Inativo">Inativo</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <button onClick={() => handleSort("status")} className="flex items-center hover:text-foreground transition-colors">
+                    Status <SortIcon column="status" />
+                  </button>
                 </TableHead>
                 <TableHead>
-                  <Select value={gradeFilter} onValueChange={setGradeFilter}>
-                    <SelectTrigger className="h-8 text-xs rounded-md">
-                      <SelectValue placeholder="Série" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas</SelectItem>
-                      {grades.map((g) => (
-                        <SelectItem key={g} value={g}>{g}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <button onClick={() => handleSort("serie")} className="flex items-center hover:text-foreground transition-colors">
+                    Série <SortIcon column="serie" />
+                  </button>
                 </TableHead>
                 <TableHead>
-                  <Select value={shiftFilter} onValueChange={setShiftFilter}>
-                    <SelectTrigger className="h-8 text-xs rounded-md">
-                      <SelectValue placeholder="Turno" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos</SelectItem>
-                      {shifts.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <button onClick={() => handleSort("turno")} className="flex items-center hover:text-foreground transition-colors">
+                    Turno <SortIcon column="turno" />
+                  </button>
                 </TableHead>
                 <TableHead className="hidden md:table-cell">Responsável</TableHead>
                 <TableHead className="hidden lg:table-cell">Telefone 1</TableHead>
@@ -313,7 +404,7 @@ export default function Students() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((student) => {
+              {filteredAndSorted.map((student) => {
                 const matriculaAtiva = getMatriculaAtiva(student);
                 return (
                 <TableRow 
@@ -380,7 +471,7 @@ export default function Students() {
                 </TableRow>
               );
               })}
-              {filtered.length === 0 && (
+              {filteredAndSorted.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                     Nenhum aluno encontrado.

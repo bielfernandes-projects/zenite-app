@@ -1,5 +1,4 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,20 +13,23 @@ import {
 import { User, LogOut, Settings } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { profileApi } from "@/lib/api";
+import { AvatarImage } from "@/components/ui/avatar";
 
 const breadcrumbMap: Record<string, string> = {
-  "/": "Dashboard",
+  "/": "Início",
   "/alunos": "Alunos",
   "/documentos": "Documentos",
   "/financeiro/vendas": "Vendas",
   "/financeiro/produtos": "Produtos",
+  "/perfil": "Meu Perfil",
 };
 
 function getBreadcrumbs(pathname: string): { label: string; path?: string }[] {
   const crumbs: { label: string; path?: string }[] = [{ label: "Início", path: "/" }];
 
   if (pathname === "/") {
-    crumbs.push({ label: "Dashboard" });
     return crumbs;
   }
 
@@ -54,7 +56,13 @@ export function AppHeader() {
   const { user, signOut } = useAuth();
   const breadcrumbs = getBreadcrumbs(location.pathname);
 
-  const userName = user?.email?.split("@")[0] || "Admin";
+  const { data: profile } = useQuery({
+    queryKey: ["profile", user?.id],
+    queryFn: () => profileApi.get(user!.id),
+    enabled: !!user?.id,
+  });
+
+  const userName = profile?.display_name || user?.email?.split("@")[0] || "Admin";
   const userEmail = user?.email || "";
   const userInitials = userName.slice(0, 2).toUpperCase();
 
@@ -66,7 +74,10 @@ export function AppHeader() {
   return (
     <header className="h-16 flex items-center justify-between border-b px-6 bg-card/50 backdrop-blur-sm sticky top-0 z-10">
       <div className="flex items-center gap-4">
-        <SidebarTrigger className="hover:bg-accent" />
+        <div className="flex items-center gap-2.5 mr-2">
+          <img src="/logo.png" alt="Logo" className="h-8 w-8 rounded-lg object-cover" />
+          <span className="text-sm font-bold text-[#01182C] whitespace-nowrap">I. I. Tia Neuma</span>
+        </div>
         <Separator orientation="vertical" className="h-6" />
         <nav className="flex items-center gap-2 text-sm">
           {breadcrumbs.map((crumb, idx) => {
@@ -99,7 +110,8 @@ export function AppHeader() {
           <DropdownMenuTrigger asChild>
             <button className="flex items-center gap-3 rounded-full hover:bg-accent transition-colors p-1.5 pr-3 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
               <Avatar className="h-8 w-8 ring-2 ring-primary/10">
-                <AvatarFallback className="bg-gradient-to-br from-primary to-emerald-700 text-primary-foreground text-xs font-bold">
+                {profile?.avatar_url && <AvatarImage src={profile.avatar_url} className="object-cover" />}
+                <AvatarFallback className="bg-gradient-to-br from-primary to-purple-800 text-primary-foreground text-xs font-bold">
                   {userInitials}
                 </AvatarFallback>
               </Avatar>
@@ -112,7 +124,7 @@ export function AppHeader() {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="cursor-pointer">
+            <DropdownMenuItem className="cursor-pointer" onClick={() => navigate("/perfil")}>
               <User className="mr-2 h-4 w-4" />
               Perfil
             </DropdownMenuItem>
