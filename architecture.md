@@ -82,7 +82,9 @@ zenite-app/
 │   │   ├── supabase.ts           # Supabase client init
 │   │   ├── assets.ts             # Logo e imagens em base64
 │   │   ├── docxParser.ts         # Parser de .docx via JSZip
+│   │   ├── docxModel.ts          # Geração de .docx modelo + lista de campos reconhecidos
 │   │   ├── profileApi.ts         # API de perfis de usuário (avatar, display_name, senha)
+│   │   ├── constants.ts          # GRADES, SHIFTS, STATUSES, RACES, SCHOOL_NAME, YEAR_RANGE
 │   │   └── utils.ts              # cn() helper (classnames)
 │   └── pages/
 │       ├── Login.tsx             # Tela de login com gradiente
@@ -462,3 +464,9 @@ bun preview       # Preview da build de produção
 8. **Importação .docx** — módulo completo com drag-and-drop, parser regex, 4 abas de edição e vínculo automático de matrícula
 9. **Sidebar** — sempre colapsada (48px), sem toggle, hover laranja, ícones centralizados verticalmente
 10. **Branding** — cores navy #01182C + orange #EF7F2D, logo no header, título "I. I. Tia Neuma"
+11. **Confirmações destrutivas** — AlertsDialog em excluir aluno (Students, StudentProfile), excluir matrícula (StudentProfile) e excluir produto (Products)
+12. **Dashboard real** — badges de tendência calculados de `enrollmentByYear` (year-over-year); não renderiza quando não há base histórica
+13. **A11y** — `autoComplete` em inputs de email/senha, `aria-label` em botões-ícone, `prefers-reduced-motion` respeitado em animações
+14. **Toaster único** — apenas Sonner (shadcn `Toaster` removido em `App.tsx`)
+15. **Constantes centralizadas** — `src/lib/constants.ts` exporta `GRADES`, `SHIFTS`, `STATUSES`, `RACES`, `YEAR_RANGE`, `SCHOOL_NAME`
+16. **Importer .docx** — botão "Baixar modelo .docx" + lista de campos reconhecidos na própria página

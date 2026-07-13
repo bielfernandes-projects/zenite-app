@@ -22,7 +22,7 @@ export default function Login() {
     const { error } = await signIn(email, password);
 
     if (error) {
-      toast.error("Credenciais inválidas");
+      toast.error("Email ou senha incorretos. Verifique e tente novamente.");
       setLoading(false);
     } else {
       navigate("/");
@@ -39,9 +39,9 @@ export default function Login() {
               <GraduationCap className="h-7 w-7 text-primary-foreground" />
             </div>
             <div>
-              <CardTitle className="text-2xl font-bold">Zênite</CardTitle>
+              <CardTitle className="text-2xl font-bold">Zenite</CardTitle>
               <CardDescription className="mt-1">
-                Sistema de Gestão Escolar
+                I. I. Tia Neuma · Sistema de Gestão Escolar
               </CardDescription>
             </div>
           </CardHeader>
@@ -58,6 +58,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
+                  autoComplete="email"
                   className="h-11"
                 />
               </div>
@@ -73,11 +74,13 @@ export default function Login() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
+                    autoComplete="current-password"
                     className="h-11 pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {showPassword ? (
@@ -97,24 +100,14 @@ export default function Login() {
               </Button>
             </form>
             <p className="mt-6 text-center text-sm text-muted-foreground">
-              Escola Zênite • 2024
+              Zenite — I. I. Tia Neuma · {new Date().getFullYear()}
             </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Right Side - Decorative */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary via-primary/90 to-emerald-800 items-center justify-center p-12 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-                <path d="M 10 0 L 0 0 0 10" fill="none" stroke="currentColor" strokeWidth="0.5" />
-              </pattern>
-            </defs>
-            <rect width="100" height="100" fill="url(#grid)" />
-          </svg>
-        </div>
+      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary via-primary/90 to-[#EF7F2D]/80 items-center justify-center p-12 relative overflow-hidden">
         <div className="relative z-10 text-center text-primary-foreground max-w-md">
           <GraduationCap className="h-24 w-24 mx-auto mb-6 opacity-90" />
           <h2 className="text-3xl font-bold mb-4">Gestão Escolar Simplificada</h2>

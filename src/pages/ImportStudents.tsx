@@ -7,6 +7,8 @@ import {
   AlertCircle,
   Trash2,
   Pencil,
+  Download,
+  FileText,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -38,11 +40,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { parseDocxFiles, ParsedStudent } from "@/lib/docxParser";
+import { generateModelDocx, RECOGNIZED_FIELDS } from "@/lib/docxModel";
 import { alunosApi, matriculasApi } from "@/lib/api";
 import { toast } from "sonner";
+import { GRADES, SHIFTS } from "@/lib/constants";
 
-const grades = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"];
-const shifts = ["Manhã", "Tarde", "Integral"];
+const grades = GRADES;
+const shifts = SHIFTS;
 
 interface ImportResult {
   imported: number;
@@ -92,7 +96,7 @@ export default function ImportStudents() {
         );
       }
     } catch {
-      toast.error("Erro ao processar arquivos");
+      toast.error("Não foi possível processar os arquivos. Verifique se são .docx válidos.");
     } finally {
       setIsProcessing(false);
     }
@@ -221,14 +225,57 @@ export default function ImportStudents() {
     importMutation.mutate(students);
   };
 
+  const handleDownloadModel = async () => {
+    try {
+      const blob = await generateModelDocx();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "modelo-ficha-aluno.docx";
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Modelo baixado com sucesso");
+    } catch {
+      toast.error("Erro ao gerar modelo");
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Importar Alunos</h1>
-        <p className="text-muted-foreground mt-1">
-          Importe fichas de aluno a partir de arquivos .docx
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-3xl font-bold">Importar Alunos</h1>
+          <p className="text-muted-foreground mt-1">
+            Importe fichas de aluno a partir de arquivos .docx
+          </p>
+        </div>
+        <Button variant="outline" onClick={handleDownloadModel}>
+          <Download className="h-4 w-4 mr-2" />
+          Baixar modelo .docx
+        </Button>
       </div>
+
+      <Card className="p-4">
+        <div className="flex items-start gap-3">
+          <FileText className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+          <div className="space-y-2 flex-1">
+            <p className="text-sm font-medium">Campos reconhecidos no .docx</p>
+            <p className="text-xs text-muted-foreground">
+              O sistema identifica automaticamente os seguintes campos. Campos não reconhecidos são ignorados sem erro.
+            </p>
+            <details className="text-xs">
+              <summary className="cursor-pointer text-primary hover:underline">
+                Ver lista completa de campos
+              </summary>
+              <ul className="mt-2 space-y-1 text-muted-foreground pl-4 list-disc">
+                {RECOGNIZED_FIELDS.map((field) => (
+                  <li key={field}>{field}</li>
+                ))}
+              </ul>
+            </details>
+          </div>
+        </div>
+      </Card>
 
       <Card
         className="border-2 border-dashed border-muted-foreground/25 hover:border-muted-foreground/50 transition-colors cursor-pointer"

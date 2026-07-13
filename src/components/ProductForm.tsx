@@ -99,7 +99,7 @@ export function ProductForm({ open, onOpenChange, product, onSave }: ProductForm
       onOpenChange(false);
     },
     onError: () => {
-      toast.error("Erro ao criar produto. Tente novamente.");
+      toast.error("Não foi possível criar o produto. Verifique os campos e tente novamente.");
     },
   });
 
@@ -113,7 +113,7 @@ export function ProductForm({ open, onOpenChange, product, onSave }: ProductForm
       onOpenChange(false);
     },
     onError: () => {
-      toast.error("Erro ao atualizar produto. Tente novamente.");
+      toast.error("Não foi possível atualizar o produto. Tente novamente em alguns instantes.");
     },
   });
 

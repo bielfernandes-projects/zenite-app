@@ -127,7 +127,7 @@ export default function Documents() {
     },
     onError: (err) => {
       console.error("Erro ao criar template:", err);
-      toast.error("Erro ao criar template.");
+      toast.error("Não foi possível salvar o template. Verifique o conteúdo e tente novamente.");
     },
   });
 
@@ -150,7 +150,7 @@ export default function Documents() {
     },
     onError: (err) => {
       console.error("Erro ao atualizar template:", err);
-      toast.error("Erro ao atualizar template.");
+      toast.error("Não foi possível atualizar o template. Tente novamente em alguns instantes.");
     },
   });
 
@@ -162,7 +162,7 @@ export default function Documents() {
     },
     onError: (err) => {
       console.error("Erro ao excluir template:", err);
-      toast.error("Erro ao excluir template.");
+      toast.error("Não foi possível excluir o template. Tente novamente em alguns instantes.");
     },
   });
 
@@ -189,7 +189,7 @@ export default function Documents() {
       URL.revokeObjectURL(url);
       toast.success("Documento gerado com sucesso!");
     } catch {
-      toast.error("Erro ao gerar documento. Tente novamente.");
+      toast.error("Não foi possível gerar o PDF. Verifique se o template tem conteúdo e tente novamente.");
     } finally {
       setLoading(false);
     }
@@ -417,7 +417,7 @@ export default function Documents() {
 
         <TabsContent value="templates" className="space-y-6">
           <Card className="shadow-sm rounded-xl overflow-hidden">
-            <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20 flex flex-row items-center justify-between">
+            <CardHeader className="border-b border-border flex flex-row items-center justify-between">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <Tags className="h-4 w-4" />
                 Modelos de Documentos

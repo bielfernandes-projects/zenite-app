@@ -143,12 +143,12 @@ export default function Sales() {
 
       doc.setFontSize(20);
       doc.setFont("helvetica", "bold");
-      doc.text("ESCOLA ZÊNITE", pageWidth / 2, y, { align: "center" });
+      doc.text("I. I. TIA NEUMA", pageWidth / 2, y, { align: "center" });
       y += 8;
 
       doc.setFontSize(10);
       doc.setFont("helvetica", "normal");
-      doc.text("Ensino Fundamental - 6º ao 9º Ano", pageWidth / 2, y, { align: "center" });
+      doc.text("Educação Infantil e Ensino Fundamental I", pageWidth / 2, y, { align: "center" });
       y += 6;
       doc.text(`CNPJ: 00.000.000/0001-00`, pageWidth / 2, y, { align: "center" });
       y += 12;
@@ -275,7 +275,7 @@ export default function Sales() {
       toast.success("Venda finalizada! Recibo gerado com sucesso.");
       resetForm();
     } catch {
-      toast.error("Erro ao finalizar venda. Tente novamente.");
+      toast.error("Não foi possível finalizar a venda. Verifique os itens e tente novamente.");
     } finally {
       setLoading(false);
     }

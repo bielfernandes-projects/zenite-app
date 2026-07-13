@@ -18,6 +18,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -39,6 +49,7 @@ export default function Products() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [formOpen, setFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Produto | null>(null);
+  const [productToDelete, setProductToDelete] = useState<Produto | null>(null);
 
   const { data: produtos, isLoading, error } = useQuery({
     queryKey: ["produtos"],
@@ -51,7 +62,7 @@ export default function Products() {
       queryClient.invalidateQueries({ queryKey: ["produtos"] });
       toast.success("Produto removido com sucesso!");
     },
-    onError: () => toast.error("Erro ao remover produto"),
+    onError: () => toast.error("Não foi possível remover o produto. Tente novamente em alguns instantes."),
   });
 
   const filtered = (produtos || []).filter((p) => {
@@ -173,7 +184,7 @@ export default function Products() {
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Mais ações para ${produto.nome}`}>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -189,7 +200,7 @@ export default function Products() {
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           className="text-destructive"
-                          onClick={() => deleteMutation.mutate(produto.id)}
+                          onClick={() => setProductToDelete(produto)}
                         >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Excluir
@@ -220,6 +231,34 @@ export default function Products() {
         product={editingProduct}
         onSave={handleSave}
       />
+
+      <AlertDialog open={!!productToDelete} onOpenChange={(open) => { if (!open) setProductToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir produto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. <strong>{productToDelete?.nome}</strong> será removido permanentemente do catálogo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (productToDelete) {
+                  deleteMutation.mutate(productToDelete.id);
+                  setProductToDelete(null);
+                }
+              }}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

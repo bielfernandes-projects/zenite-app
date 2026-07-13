@@ -15,6 +15,7 @@ import {
   Legend,
 } from "recharts";
 import { Loader2 } from "lucide-react";
+import { GRADES, SHIFTS, YEAR_RANGE } from "@/lib/constants";
 
 export default function Dashboard() {
   const { data: metrics, isLoading, error } = useQuery({
@@ -36,12 +37,11 @@ export default function Dashboard() {
   });
 
   const enrollmentByYear = useMemo(() => {
-    const years = ["2023", "2024", "2025", "2026"];
-    const data = years.map((year) => ({ name: year, total: 0 }));
+    const data = YEAR_RANGE.map((year) => ({ name: year, total: 0 }));
     (matriculas as Matricula[]).forEach((m) => {
       if (m.status !== "Ativo" && m.status !== "Concluído") return;
       const yearStr = m.ano_letivo?.toString();
-      if (yearStr && years.includes(yearStr)) {
+      if (yearStr && YEAR_RANGE.includes(yearStr)) {
         const entry = data.find((d) => d.name === yearStr);
         if (entry) entry.total += 1;
       }
@@ -54,8 +54,8 @@ export default function Dashboard() {
   const morningCount = metrics?.alunos_manhã || 0;
   const afternoonCount = metrics?.alunos_tarde || 0;
 
-  const seriesOrder = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"];
-  const turnoLabel: Record<string, string> = { "Manhã": "M", "Tarde": "T", "Integral": "I" };
+  const seriesOrder = GRADES;
+  const turnoLabel: Record<string, string> = { "Manhã": "Manhã", "Tarde": "Tarde", "Integral": "Integral" };
 
   const gradeDistribution = (metrics?.por_serie || []).sort(
     (a, b) => seriesOrder.indexOf(a.serie) - seriesOrder.indexOf(b.serie)
@@ -64,7 +64,22 @@ export default function Dashboard() {
   const totalEnrollments = enrollmentByYear.reduce((sum, m) => sum + m.total, 0);
   const avgEnrollments = Math.round(totalEnrollments / enrollmentByYear.length);
 
-  const turnosOrder = ["Manhã", "Tarde", "Integral"];
+  const activeTrend = useMemo(() => {
+    const current = enrollmentByYear[enrollmentByYear.length - 1]?.total ?? 0;
+    const previous = enrollmentByYear[enrollmentByYear.length - 2]?.total ?? 0;
+    if (previous === 0) return null;
+    return Math.round(((current - previous) / previous) * 100);
+  }, [enrollmentByYear]);
+
+  const enrollmentTrend = useMemo(() => {
+    if (enrollmentByYear.length < 2) return null;
+    const current = enrollmentByYear[enrollmentByYear.length - 1]?.total ?? 0;
+    const previous = enrollmentByYear[enrollmentByYear.length - 2]?.total ?? 0;
+    if (previous === 0) return null;
+    return Math.round(((current - previous) / previous) * 100);
+  }, [enrollmentByYear]);
+
+  const turnosOrder = SHIFTS;
 
   const genderBySerieTurno = seriesOrder.flatMap((serie) =>
     turnosOrder.map((turno) => {
@@ -117,17 +132,26 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Alunos Ativos
             </CardTitle>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-emerald-700 flex items-center justify-center shadow-md">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-md">
               <Users className="h-5 w-5 text-primary-foreground" />
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-baseline gap-2">
               <p className="text-3xl font-bold text-foreground">{activeStudents}</p>
-              <Badge variant="secondary" className="bg-success/10 text-success border-success/20">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +12%
-              </Badge>
+              {activeTrend !== null && activeTrend !== 0 ? (
+                <Badge
+                  variant="secondary"
+                  className={
+                    activeTrend > 0
+                      ? "bg-success/10 text-success border-success/20"
+                      : "bg-destructive/10 text-destructive border-destructive/20"
+                  }
+                >
+                  {activeTrend > 0 ? <TrendingUp className="h-3 w-3 mr-1" /> : <ArrowUpRight className="h-3 w-3 mr-1 rotate-180" />}
+                  {activeTrend > 0 ? "+" : ""}{activeTrend}%
+                </Badge>
+              ) : null}
             </div>
             <p className="text-xs text-muted-foreground">
               de {students.length} matriculados
@@ -141,17 +165,26 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Matrículas (Ano)
             </CardTitle>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-md">
-              <GraduationCap className="h-5 w-5 text-white" />
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-md">
+              <GraduationCap className="h-5 w-5 text-primary-foreground" />
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
             <div className="flex items-baseline gap-2">
               <p className="text-3xl font-bold text-foreground">{totalEnrollments}</p>
-              <Badge variant="secondary" className="bg-info/10 text-info border-info/20">
-                <ArrowUpRight className="h-3 w-3 mr-1" />
-                +8%
-              </Badge>
+              {enrollmentTrend !== null && enrollmentTrend !== 0 ? (
+                <Badge
+                  variant="secondary"
+                  className={
+                    enrollmentTrend > 0
+                      ? "bg-success/10 text-success border-success/20"
+                      : "bg-destructive/10 text-destructive border-destructive/20"
+                  }
+                >
+                  {enrollmentTrend > 0 ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowUpRight className="h-3 w-3 mr-1 rotate-180" />}
+                  {enrollmentTrend > 0 ? "+" : ""}{enrollmentTrend}%
+                </Badge>
+              ) : null}
             </div>
             <p className="text-xs text-muted-foreground">
               Média de {avgEnrollments} por ano
@@ -165,7 +198,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Turno Manhã
             </CardTitle>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-700 flex items-center justify-center shadow-md">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#EF7F2D] to-[#D96518] flex items-center justify-center shadow-md">
               <Sun className="h-5 w-5 text-white" />
             </div>
           </CardHeader>
@@ -176,7 +209,7 @@ export default function Dashboard() {
             </div>
             <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-amber-500 to-amber-600 rounded-full transition-all duration-500"
+                className="h-full bg-gradient-to-r from-[#EF7F2D] to-[#D96518] rounded-full transition-all duration-500"
                 style={{
                   width: students.length > 0 ? `${(morningCount / students.length) * 100}%` : '0%',
                 }}
@@ -191,7 +224,7 @@ export default function Dashboard() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Turno Tarde
             </CardTitle>
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-md">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#EF7F2D] to-[#D96518] flex items-center justify-center shadow-md">
               <Sun className="h-5 w-5 text-white" />
             </div>
           </CardHeader>
@@ -202,7 +235,7 @@ export default function Dashboard() {
             </div>
             <div className="w-full h-2 bg-secondary rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-purple-500 to-purple-600 rounded-full transition-all duration-500"
+                className="h-full bg-gradient-to-r from-[#EF7F2D] to-[#D96518] rounded-full transition-all duration-500"
                 style={{
                   width: students.length > 0 ? `${(afternoonCount / students.length) * 100}%` : '0%',
                 }}
@@ -216,7 +249,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Enrollments Chart */}
         <Card className="lg:col-span-2 border-none shadow-lg animate-slide-up">
-          <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+          <CardHeader className="border-b border-border">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-semibold text-foreground">
@@ -254,7 +287,7 @@ export default function Dashboard() {
                   }}
                   formatter={(value: number) => [value, "Alunos"]}
                 />
-                <Bar dataKey="total" fill="#3B82F6" name="Matrículas" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="total" fill="#01182C" name="Matrículas" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -262,7 +295,7 @@ export default function Dashboard() {
 
         {/* Grade Distribution */}
         <Card className="border-none shadow-lg animate-slide-up" style={{ animationDelay: '0.1s' }}>
-          <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+          <CardHeader className="border-b border-border">
             <CardTitle className="text-lg font-semibold text-foreground">
               Por Série
             </CardTitle>
@@ -291,7 +324,7 @@ export default function Dashboard() {
                   </div>
                   <div className="w-full h-2.5 bg-secondary rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-gradient-to-r from-primary via-emerald-600 to-emerald-700 rounded-full transition-all duration-700 ease-out group-hover:brightness-110"
+                      className="h-full bg-gradient-to-r from-primary to-[#01182C]/80 rounded-full transition-all duration-700 ease-out group-hover:brightness-110"
                       style={{
                         width: students.length > 0 ? `${(g.count / students.length) * 100}%` : '0%',
                       }}
@@ -311,7 +344,7 @@ export default function Dashboard() {
 
       {/* Gender by Serie & Turno */}
       <Card className="border-none shadow-lg animate-slide-up">
-        <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+        <CardHeader className="border-b border-border">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg font-semibold text-foreground">
@@ -350,23 +383,23 @@ export default function Dashboard() {
                   }}
                   formatter={(value: number, name: string) => [
                     value,
-                    name === "masculino" ? "Meninos" : "Meninas",
+                    name === "masculino" ? "Masculino" : "Feminino",
                   ]}
                 />
                 <Legend
-                  formatter={(value: string) => value === "masculino" ? "Meninos" : "Meninas"}
+                  formatter={(value: string) => value === "masculino" ? "Masculino" : "Feminino"}
                 />
                 <Bar
                   stackId="a"
                   dataKey="masculino"
-                  fill="#3B82F6"
+                  fill="#01182C"
                   name="masculino"
                   radius={[4, 4, 0, 0]}
                 />
                 <Bar
                   stackId="a"
                   dataKey="feminino"
-                  fill="#EC4899"
+                  fill="#EF7F2D"
                   name="feminino"
                   radius={[4, 4, 0, 0]}
                 />

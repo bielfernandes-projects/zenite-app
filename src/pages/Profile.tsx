@@ -44,7 +44,7 @@ export default function ProfilePage() {
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       toast.success("Perfil atualizado com sucesso!");
     },
-    onError: () => toast.error("Erro ao atualizar perfil."),
+    onError: () => toast.error("Não foi possível atualizar o perfil. Tente novamente em alguns instantes."),
   });
 
   const uploadAvatarMutation = useMutation({
@@ -55,7 +55,7 @@ export default function ProfilePage() {
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       toast.success("Foto de perfil atualizada!");
     },
-    onError: () => toast.error("Erro ao enviar foto."),
+    onError: () => toast.error("Não foi possível enviar a foto. Verifique o tamanho (máx 2MB) e tente novamente."),
   });
 
   const changePasswordMutation = useMutation({
@@ -65,7 +65,7 @@ export default function ProfilePage() {
       setNewPassword("");
       setConfirmPassword("");
     },
-    onError: () => toast.error("Erro ao alterar senha."),
+    onError: () => toast.error("Não foi possível alterar a senha. Verifique se tem pelo menos 6 caracteres."),
   });
 
   const handleSaveProfile = () => {
@@ -140,7 +140,7 @@ export default function ProfilePage() {
             <div className="relative group">
               <Avatar className="h-24 w-24 ring-4 ring-primary/10 cursor-pointer" onClick={() => fileInputRef.current?.click()}>
                 {avatarPreview && <AvatarImage src={avatarPreview} className="object-cover" />}
-                <AvatarFallback className="bg-gradient-to-br from-primary to-purple-800 text-primary-foreground text-2xl font-bold">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-[#01182C] text-primary-foreground text-2xl font-bold">
                   {userInitials}
                 </AvatarFallback>
               </Avatar>

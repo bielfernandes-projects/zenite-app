@@ -54,9 +54,10 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { GRADES, SHIFTS } from "@/lib/constants";
 
-const grades = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"];
-const shifts = ["Manhã", "Tarde", "Integral"];
+const grades = GRADES;
+const shifts = SHIFTS;
 const matriculaStatuses = ["Ativo", "Concluído", "Transferido", "Cancelado"];
 
 const matriculaSchema = z.object({
@@ -77,6 +78,7 @@ export default function StudentProfile() {
   const [matriculaDialogOpen, setMatriculaDialogOpen] = useState(false);
   const [editingMatricula, setEditingMatricula] = useState<Matricula | null>(null);
   const [deletingMatriculaId, setDeletingMatriculaId] = useState<string | null>(null);
+  const [deletingAluno, setDeletingAluno] = useState(false);
   const [tabValue, setTabValue] = useState("personal");
 
   const { data: student, isLoading, error } = useQuery({
@@ -99,7 +101,7 @@ export default function StudentProfile() {
       navigate("/alunos");
     },
     onError: () => {
-      toast.error("Erro ao excluir aluno");
+      toast.error("Não foi possível excluir o aluno. Tente novamente em alguns instantes.");
     },
   });
 
@@ -128,7 +130,7 @@ export default function StudentProfile() {
       matriculaForm.reset();
     },
     onError: () => {
-      toast.error("Erro ao cadastrar matrícula. Tente novamente.");
+      toast.error("Não foi possível cadastrar a matrícula. Verifique os campos e tente novamente.");
     },
   });
 
@@ -144,7 +146,7 @@ export default function StudentProfile() {
       matriculaForm.reset();
     },
     onError: () => {
-      toast.error("Erro ao atualizar matrícula. Tente novamente.");
+      toast.error("Não foi possível atualizar a matrícula. Tente novamente em alguns instantes.");
     },
   });
 
@@ -157,7 +159,7 @@ export default function StudentProfile() {
       setDeletingMatriculaId(null);
     },
     onError: () => {
-      toast.error("Erro ao excluir matrícula. Tente novamente.");
+      toast.error("Não foi possível excluir a matrícula. Tente novamente em alguns instantes.");
     },
   });
 
@@ -192,9 +194,12 @@ export default function StudentProfile() {
   };
 
   const handleDelete = () => {
-    if (confirm("Tem certeza que deseja excluir este aluno?")) {
-      deleteMutation.mutate();
-    }
+    setDeletingAluno(true);
+  };
+
+  const confirmDeleteAluno = () => {
+    deleteMutation.mutate();
+    setDeletingAluno(false);
   };
 
   const onSubmitMatricula = (data: MatriculaFormData) => {
@@ -211,7 +216,7 @@ export default function StudentProfile() {
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
     } catch {
-      toast.error("Erro ao gerar ficha do aluno.");
+      toast.error("Não foi possível gerar a ficha do aluno. Tente novamente em alguns instantes.");
     }
   };
 
@@ -330,7 +335,7 @@ export default function StudentProfile() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Dados Pessoais */}
             <Card className="border-none shadow-sm">
-              <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+              <CardHeader className="border-b border-border">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <User className="h-4 w-4" />
                   Dados Pessoais
@@ -368,7 +373,7 @@ export default function StudentProfile() {
 
             {/* Filiação */}
             <Card className="border-none shadow-sm">
-              <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+              <CardHeader className="border-b border-border">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <Contact className="h-4 w-4" />
                   Filiação
@@ -414,7 +419,7 @@ export default function StudentProfile() {
 
             {/* Contato */}
             <Card className="border-none shadow-sm">
-              <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+              <CardHeader className="border-b border-border">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <Phone className="h-4 w-4" />
                   Contato e Endereço
@@ -467,7 +472,7 @@ export default function StudentProfile() {
 
             {/* Documentos */}
             <Card className="border-none shadow-sm">
-              <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20">
+              <CardHeader className="border-b border-border">
                 <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <GraduationCap className="h-4 w-4" />
                   Documentos
@@ -520,7 +525,7 @@ export default function StudentProfile() {
 
         <TabsContent value="history" className="space-y-6">
           <Card className="border-none shadow-sm">
-            <CardHeader className="border-b bg-gradient-to-r from-card to-accent/20 flex flex-row items-center justify-between">
+            <CardHeader className="border-b border-border flex flex-row items-center justify-between">
               <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <GraduationCap className="h-4 w-4" />
                 Matrículas
@@ -753,6 +758,29 @@ export default function StudentProfile() {
           queryClient.invalidateQueries({ queryKey: ["matriculas", id] });
         }}
       />
+
+      <AlertDialog open={deletingAluno} onOpenChange={(open) => { if (!open) setDeletingAluno(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir aluno?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. <strong>{student?.nome}</strong> e todas as matrículas, histórico e dados vinculados serão removidos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDeleteAluno}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -28,3 +28,7 @@ dist-ssr
 
 # Supabase CLI temp
 supabase/
+
+# Impeccable assessment artifacts
+.assessment-b/
+.impeccable/

@@ -25,8 +25,9 @@ import { toast } from "sonner";
 import { alunosApi, matriculasApi, Aluno } from "@/lib/api";
 import { maskCPF, maskRG, maskCEP, maskPhone } from "@/lib/masks";
 import { cn } from "@/lib/utils";
+import { GRADES } from "@/lib/constants";
 
-const grades = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"];
+const grades = GRADES;
 const shifts = ["Manhã", "Tarde", "Integral"] as const;
 const racas = ["Branca", "Preta", "Parda", "Amarela", "Indígena", "Não declarada"];
 

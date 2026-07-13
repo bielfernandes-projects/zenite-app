@@ -29,6 +29,16 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Table,
   TableBody,
   TableCell,
@@ -43,9 +53,10 @@ import jsPDF from "jspdf";
 import { applyPlugin } from "jspdf-autotable";
 applyPlugin(jsPDF);
 import { toast } from "sonner";
+import { GRADES, SHIFTS } from "@/lib/constants";
 
-const grades = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"];
-const shifts = ["Manhã", "Tarde", "Integral"] as const;
+const grades = GRADES;
+const shifts = SHIFTS;
 
 export default function Students() {
   const navigate = useNavigate();
@@ -58,6 +69,7 @@ export default function Students() {
   const [sortColumn, setSortColumn] = useState<"nome" | "status" | "serie" | "turno">("nome");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
   const [editingStudent, setEditingStudent] = useState<Aluno | null>(null);
+  const [studentToDelete, setStudentToDelete] = useState<Aluno | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [serieDialogOpen, setSerieDialogOpen] = useState(false);
   const [selectedSerie, setSelectedSerie] = useState("");
@@ -77,7 +89,7 @@ export default function Students() {
       toast.success("Aluno removido com sucesso!");
     },
     onError: () => {
-      toast.error("Erro ao excluir aluno");
+      toast.error("Não foi possível excluir o aluno. Tente novamente em alguns instantes.");
     },
   });
 
@@ -130,7 +142,15 @@ export default function Students() {
   };
 
   const handleDelete = (id: string) => {
-    deleteMutation.mutate(id);
+    const student = alunos.find((s) => s.id === id);
+    if (student) setStudentToDelete(student);
+  };
+
+  const confirmDelete = () => {
+    if (studentToDelete) {
+      deleteMutation.mutate(studentToDelete.id);
+      setStudentToDelete(null);
+    }
   };
 
   const toggleArrayFilter = (arr: string[], setArr: (v: string[]) => void, value: string) => {
@@ -200,7 +220,7 @@ export default function Students() {
       toast.success("Lista gerada com sucesso!");
     } catch (e) {
       console.error("Erro ao gerar PDF:", e);
-      toast.error("Erro ao gerar PDF. Tente novamente.");
+      toast.error("Não foi possível gerar o PDF. Tente novamente em alguns instantes.");
     } finally {
       setPdfLoading(false);
     }
@@ -444,7 +464,7 @@ export default function Students() {
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Mais ações para ${student.nome}`}>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -518,6 +538,29 @@ export default function Students() {
         student={editingStudent}
         onSave={handleSave}
       />
+
+      <AlertDialog open={!!studentToDelete} onOpenChange={(open) => { if (!open) setStudentToDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir aluno?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. <strong>{studentToDelete?.nome}</strong> e todas as matrículas, histórico e dados vinculados serão removidos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={confirmDelete}
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : null}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
