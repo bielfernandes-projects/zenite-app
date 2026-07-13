@@ -386,6 +386,99 @@ export function substituirTags(conteudo: string, aluno: Aluno, matriculaAtiva?: 
   return resultado;
 }
 
+interface TextSegment {
+  text: string;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+}
+
+function parseStyledText(text: string): TextSegment[] {
+  const segments: TextSegment[] = [];
+  const tagRegex = /<(\/?)([biu])>/gi;
+  let lastIndex = 0;
+  let bold = false;
+  let italic = false;
+  let underline = false;
+  let match: RegExpExecArray | null;
+
+  while ((match = tagRegex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ text: text.slice(lastIndex, match.index), bold, italic, underline });
+    }
+    const isClosing = match[1] === "/";
+    const tag = match[2].toLowerCase();
+    if (tag === "b") bold = !isClosing;
+    else if (tag === "i") italic = !isClosing;
+    else if (tag === "u") underline = !isClosing;
+    lastIndex = tagRegex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({ text: text.slice(lastIndex), bold, italic, underline });
+  }
+
+  return segments.filter((s) => s.text.length > 0);
+}
+
+function renderFormattedParagraph(
+  doc: ReturnType<typeof import("jspdf").default>,
+  text: string,
+  startY: number,
+  margin: number,
+  maxWidth: number,
+  pageHeight: number,
+): number {
+  const segments = parseStyledText(text);
+  let x = margin;
+  let y = startY;
+  const lineHeight = 7;
+
+  for (const seg of segments) {
+    if (!seg.text) continue;
+
+    const style =
+      seg.bold && seg.italic
+        ? "bolditalic"
+        : seg.bold
+          ? "bold"
+          : seg.italic
+            ? "italic"
+            : "normal";
+
+    doc.setFont("helvetica", style);
+
+    const parts = seg.text.split(/(\s+)/);
+
+    for (const part of parts) {
+      if (part === "") continue;
+
+      const partWidth = doc.getTextWidth(part);
+
+      if (x + partWidth > margin + maxWidth && x > margin) {
+        y += lineHeight;
+        x = margin;
+      }
+
+      if (y > pageHeight - 60) {
+        doc.addPage();
+        y = margin;
+      }
+
+      doc.text(part, x, y);
+
+      if (seg.underline) {
+        doc.setLineWidth(0.3);
+        doc.line(x, y + 1, x + partWidth, y + 1);
+      }
+
+      x += partWidth;
+    }
+  }
+
+  return y + lineHeight;
+}
+
 export async function gerarDocumentoPDF(titulo: string, corpo: string, tituloImpresso?: string, requerAssinatura: boolean = true): Promise<Blob> {
   const { default: jsPDF } = await import("jspdf");
   const doc = new jsPDF();
@@ -443,9 +536,7 @@ export async function gerarDocumentoPDF(titulo: string, corpo: string, tituloImp
         doc.addPage();
         y = margin;
       }
-      doc.text(paragrafo, margin, y, { maxWidth, align: "justify" });
-      const h = doc.getTextDimensions(paragrafo, { maxWidth }).h || 7;
-      y += h + 2;
+      y = renderFormattedParagraph(doc, paragrafo, y, margin, maxWidth, pageHeight) + 2;
     }
   }
 

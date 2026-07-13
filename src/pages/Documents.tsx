@@ -547,6 +547,12 @@ export default function Documents() {
                   </Badge>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Use <code className="text-foreground/70">&lt;b&gt;texto&lt;/b&gt;</code> para <b>negrito</b>,{" "}
+                <code className="text-foreground/70">&lt;i&gt;texto&lt;/i&gt;</code> para <i>itálico</i> e{" "}
+                <code className="text-foreground/70">&lt;u&gt;texto&lt;/u&gt;</code> para <u>sublinhado</u>.
+                As tags funcionam combinadas e podem ser usadas em qualquer parte do texto.
+              </p>
             </div>
 
             <div className="space-y-2">
