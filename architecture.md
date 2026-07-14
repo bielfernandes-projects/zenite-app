@@ -3,7 +3,7 @@
 > Sistema de Gestão Escolar — Instituto Infantil Tia Neuma
 
 ## Versão
-2.0 — Auditoria de segurança e LGPD aplicada em 2026-07-14.
+2.1 — Limpeza de dados e correções de segurança em 2026-07-14.
 
 ## Visão Geral
 
@@ -274,10 +274,11 @@ matriculasApi.delete(id)         // Remove matrícula
 ### `dashboardApi`
 
 ```typescript
-dashboardApi.getMetrics()        // Métricas computadas em memória a partir de alunosApi.list()
+dashboardApi.getMetrics()          // RPC dashboard_metrics(ano) — totais sem PII
+dashboardApi.getGeneroSerieTurno() // RPC dashboard_genero_serie_turno(ano) — gráfico gênero/série/turno
 ```
 
-Retorna: `{ total_alunos_ativos, alunos_inadimplentes, alunos_manhã, alunos_tarde, por_serie }`
+Retorna: `{ total_alunos_ativos, alunos_inadimplentes, alunos_manhã, alunos_tarde, por_serie, genero_serie_turno }`
 
 ### `produtosApi`
 
@@ -311,9 +312,9 @@ templatesApi.delete(id)          // Remove template
 API de perfis de usuário (arquivo separado: `src/lib/profileApi.ts`).
 
 ```typescript
-profileApi.get(userId)                  // Busca profile por user_id (cria se não existir)
-profileApi.update(userId, data)         // Atualiza display_name, sobrescreve senha via Supabase Auth
-profileApi.uploadAvatar(userId, file)   // Upload de avatar para Supabase Storage (bucket "avatars")
+profileApi.get()                   // Busca profile do usuário logado (auth.uid())
+profileApi.update(data)            // Atualiza display_name, sobrescreve senha via Supabase Auth
+profileApi.uploadAvatar(file)      // Upload de avatar para Supabase Storage (bucket "avatars")
 ```
 
 ### Funções Auxiliares
@@ -333,7 +334,7 @@ formatarCPF(cpf)                                    // "000.000.000-00"
 - **Provider:** Supabase Auth
 - **Modo demo:** Ativado quando `VITE_SUPABASE_URL` não está configurada — aceita qualquer credencial
 - **Fluxo login:** `Login.tsx` → `signIn()` → `AuthContext` → `ProtectedRoute` → rotas protegidas
-- **Fluxo cadastro:** `Login.tsx` → dialog "Criar Conta" → `signUp(email, password, displayName)` → email de confirmação (PT-BR com branding Zenite) → redirect para `zenite-app.vercel.app`
+- **Fluxo cadastro:** Admin cria usuários pelo painel Supabase; primeiro login confirma email e profile é criado via trigger `handle_new_user()`
 - **Token:** JWT injetado automaticamente via client Supabase
 - **Perfis:** Tabela `profiles` vinculada a auth.users, auto-criada via trigger `handle_new_user()` — usa `raw_user_meta_data ->> 'display_name'` com fallback para prefixo do email
 - **Avatar:** Bucket `avatars` no Supabase Storage
@@ -342,11 +343,10 @@ formatarCPF(cpf)                                    // "000.000.000-00"
 
 ### Usuários Cadastrados
 
-| Email | Último Login |
+| Email | Role |
 |---|---|
-| admin.zeniteapp@gmail.com | ~Jun/2026 |
-| dev@dev.com | ~Mai/2026 |
-| pedrohcarvalho556@gmail.com | ~Abr/2026 |
+| admin.zeniteapp@gmail.com | admin |
+| gab.m.fernandes@gmail.com | funcionario |
 
 ## Sistema de Documentos (PDF)
 
@@ -470,11 +470,13 @@ Aplicadas em ordem, versionadas em `supabase/migrations/`:
 
 - **RLS ativa** em todas as tabelas de dados; policies `staff_*` baseadas em `is_staff()` (que checa `role in ('admin','funcionario')`)
 - **Bucket `avatars` privado** com policies por usuário (`auth.uid()` é dono do path)
-- **CSP** em `vercel.json` restringe scripts, imagens e conexões
+- **CSP** em `vercel.json` restringe scripts, imagens e conexões; permite `fonts.googleapis.com` e `fonts.gstatic.com`
 - **HSTS** força HTTPS
 - **Sessão em `sessionStorage`** (não persiste entre abas)
 - **Audit log** registra INSERT/UPDATE/DELETE em `alunos`/`matriculas`/`produtos`/`recibos`/`templates_documentos` + `PDF_GENERATED` via `log_operacao()`
 - **Cadastro público desabilitado** — admin cria usuários pelo painel Supabase
+- **`nativeFetch`** — bypass via iframe para evitar override por extensões de navegador
+- **RLS policies sem recursão** — `is_admin()` e `my_role()` são security definer para evitar循环 na tabela `profiles`
 
 ## Observações e Pendências
 
@@ -483,19 +485,19 @@ Aplicadas em ordem, versionadas em `supabase/migrations/`:
 3. **Playwright** — configurado mas sem testes E2E escritos
 4. **Dois sistemas de toast** — shadcn/ui Toaster e Sonner coexistem; o código usa Sonner majoritariamente
 5. **Dashboard** — métricas via RPCs `dashboard_metrics`, `dashboard_por_serie`, `dashboard_genero_serie_turno`; gráficos filtram por ano letivo atual
-6. **Students.tsx** — filtros multi-select (série, turno, status) + ordenação por coluna; PDF gera lista filtrada; filtros preservados via `sessionStorage` ao navegar para perfil e voltar
+6. **Students.tsx** — filtros multi-select (série, turno, status) + ordenação por coluna; PDF gera lista filtrada; filtros preservados via `sessionStorage` ao navegar para perfil e voltar; status padrão "Ativo"
 7. **Matrícula CRUD** —StudentProfile.tsx tem edição e exclusão de matrículas via dialog e AlertDialog
 8. **Importação .docx** — módulo completo com drag-and-drop, parser regex, 4 abas de edição, vínculo automático de matrícula e capitalização automática de nomes
-9. **Sidebar** — sempre colapsada (48px), sem toggle, hover laranja, ícones centralizados verticalmente
+9. **Sidebar** — sempre colapsada (48px), sem toggle, hover laranja, ícones centralizados verticalmente; seção "Administração" só aparece para admin
 10. **Branding** — cores navy #01182C + orange #EF7F2D, logo no header, título "I. I. Tia Neuma"
-11. **Confirmações destrutivas** — AlertsDialog em excluir aluno (Students, StudentProfile), excluir matrícula (StudentProfile), excluir produto (Products), e em gerar PDF de aluno
-12. **Dashboard real** — badges de tendência calculados de `enrollmentByYear` (year-over-year); não renderiza quando não há base histórica
+11. **Confirmações destrutivas** — AlertDialog em excluir aluno (Students, StudentProfile), excluir matrícula (StudentProfile), excluir produto (Products), e em gerar PDF de aluno
+12. **Dashboard real** — badges de tendência calculados de `enrollmentByYear` (year-over-year); não renderiza quando não há base histórica; `naoInformado` no gráfico de gênero só aparece quando há dados
 13. **A11y** — `autoComplete` em inputs de email/senha, `aria-label` em botões-ícone, `prefers-reduced-motion` respeitado em animações
 14. **Toaster único** — apenas Sonner (shadcn `Toaster` removido em `App.tsx`)
 15. **Constantes centralizadas** — `src/lib/constants.ts` exporta `GRADES`, `SHIFTS` (Manhã/Tarde), `STATUSES`, `RACES`, `YEAR_RANGE`, `SCHOOL_NAME`, `CURRENT_YEAR`
 16. **Turno Integral removido** — escola só tem Manhã e Tarde; removido de constants, api, Dashboard, StudentForm e docxParser
 17. **Importer .docx** — botão "Baixar modelo .docx" + lista de campos reconhecidos na própria página
-18. **Capacetes/Papeis (RBAC)**: tabela `profiles` tem coluna `role` (`admin` | `funcionario`); RLS em todas as tabelas de dados checa `public.is_staff()`; rota `/admin/usuarios` protegida por `ProtectedRoute roles={['admin']}`
+18. **RBAC** — tabela `profiles` tem coluna `role` (`admin` | `funcionario`); RLS em todas as tabelas de dados checa `public.is_staff()`; rota `/admin/usuarios` protegida por `ProtectedRoute roles={['admin']}`
 19. **Sessão em sessionStorage** — não persiste entre abas/fechamento (mitiga XSS e roubo de token)
 20. **RPCs de agregação** — `dashboard_metrics(ano)`, `dashboard_por_serie(ano)`, `dashboard_genero_serie_turno(ano)` substituem `select(*)` no Dashboard; PII não trafega para contar
 21. **Projeção em `alunosApi.list()`** — lista retorna apenas campos necessários (sem CPF, RG, NIS, CIA, endereço); apenas `get(id)` retorna tudo
@@ -504,3 +506,6 @@ Aplicadas em ordem, versionadas em `supabase/migrations/`:
 24. **Storage avatars** — bucket `avatars` com policies restritas (so dono escreve/le/apaga); `profileApi.uploadAvatar(file)` obtem `auth.uid()` internamente
 25. **Cadastro publico removido** — `Login.tsx` nao tem botao "Criar Conta"; admin cria usuarios pelo painel Supabase; primeiro login confirma email e profile e criado via trigger `handle_new_user()`
 26. **Confirmation dialog em geracao de PDF** — `StudentProfile.tsx` exige confirmacao antes de gerar ficha do aluno (alinhado com audit log)
+27. **nativeFetch bypass** — `supabase.ts` captura `window.fetch` via iframe para evitar que extensões de navegador sobrescrevam o fetch global
+28. **RLS policies sem recursão** — `is_admin()` e `my_role()` são security definer para evitar循环 na tabela `profiles`
+29. **Dados limpos** — todos os alunos, matrículas e fotos foram excluídos em 2026-07-14 para início de população com dados reais; produtos e templates mantidos
