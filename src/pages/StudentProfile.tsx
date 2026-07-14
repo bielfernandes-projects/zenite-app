@@ -98,7 +98,7 @@ export default function StudentProfile() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["alunos"] });
       toast.success("Aluno excluído com sucesso!");
-      navigate("/alunos");
+      navigate(-1);
     },
     onError: () => {
       toast.error("Não foi possível excluir o aluno. Tente novamente em alguns instantes.");
@@ -242,7 +242,7 @@ export default function StudentProfile() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px]">
         <p className="text-muted-foreground mb-4">Aluno não encontrado</p>
-        <Button variant="outline" onClick={() => navigate("/alunos")}>
+        <Button variant="outline" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar para Alunos
         </Button>
@@ -254,7 +254,7 @@ export default function StudentProfile() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => navigate("/alunos")}>
+        <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar
         </Button>

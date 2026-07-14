@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Plus, MoreHorizontal, Pencil, Trash2, Loader2, FileDown, List, X, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
@@ -73,6 +73,27 @@ export default function Students() {
   const [pdfLoading, setPdfLoading] = useState(false);
   const [serieDialogOpen, setSerieDialogOpen] = useState(false);
   const [selectedSerie, setSelectedSerie] = useState("");
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem("students-filters");
+    if (saved) {
+      try {
+        const f = JSON.parse(saved);
+        setSearch(f.search ?? "");
+        setSelectedGrades(f.selectedGrades ?? []);
+        setSelectedShifts(f.selectedShifts ?? []);
+        setSelectedStatuses(f.selectedStatuses ?? ["Ativo"]);
+      } catch {}
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      sessionStorage.setItem("students-filters", JSON.stringify({
+        search, selectedGrades, selectedShifts, selectedStatuses,
+      }));
+    };
+  });
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["alunos", search],

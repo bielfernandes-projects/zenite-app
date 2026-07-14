@@ -84,7 +84,7 @@ zenite-app/
 │   │   ├── docxParser.ts         # Parser de .docx via JSZip
 │   │   ├── docxModel.ts          # Geração de .docx modelo + lista de campos reconhecidos
 │   │   ├── profileApi.ts         # API de perfis de usuário (avatar, display_name, senha)
-│   │   ├── constants.ts          # GRADES, SHIFTS, STATUSES, RACES, SCHOOL_NAME, YEAR_RANGE
+│   │   ├── constants.ts          # GRADES, SHIFTS, STATUSES, RACES, SCHOOL_NAME, YEAR_RANGE, CURRENT_YEAR
 │   │   └── utils.ts              # cn() helper (classnames)
 │   └── pages/
 │       ├── Login.tsx             # Tela de login com gradiente
@@ -104,7 +104,7 @@ zenite-app/
 | Path | Componente | Descrição |
 |---|---|---|
 | `/login` | `Login.tsx` | Autenticação via Supabase Auth |
-| `/` | `Dashboard.tsx` | Métricas, cards de turno, gráfico de matrículas por série e gênero |
+| `/` | `Dashboard.tsx` | Métricas, cards de turno, gráfico de matrículas por série e gênero (alunos ativos do ano letivo atual) |
 | `/alunos` | `Students.tsx` | Tabela CRUD com filtros multi-select, ordenação, PDF lista filtrada |
 | `/alunos/:id` | `StudentProfile.tsx` | Perfil completo + CRUD de matrículas + impressão de ficha |
 | `/importar` | `ImportStudents.tsx` | Importação de alunos via .docx com drag-and-drop |
@@ -129,7 +129,7 @@ Cadastro dos alunos. Campo `id` é UUID gerado pelo Supabase.
 | `id` | uuid | auto | Chave primária |
 | `nome` | text | sim | Nome completo |
 | `serie` | text | sim | Série (1º–5º Ano, Infantil I–V, etc.) |
-| `turno` | text | sim | Manhã / Tarde / Integral |
+| `turno` | text | sim | Manhã / Tarde |
 | `genero` | text | — | Masculino / Feminino |
 | `status` | text | — | Ativo / Inativo |
 | `situacao` | text | — | Ativo / Inativo |
@@ -274,7 +274,7 @@ matriculasApi.delete(id)         // Remove matrícula
 dashboardApi.getMetrics()        // Métricas computadas em memória a partir de alunosApi.list()
 ```
 
-Retorna: `{ total_alunos_ativos, alunos_inadimplentes, alunos_manhã, alunos_tarde, alunos_integral, por_serie }`
+Retorna: `{ total_alunos_ativos, alunos_inadimplentes, alunos_manhã, alunos_tarde, por_serie }`
 
 ### `produtosApi`
 
@@ -329,10 +329,13 @@ formatarCPF(cpf)                                    // "000.000.000-00"
 
 - **Provider:** Supabase Auth
 - **Modo demo:** Ativado quando `VITE_SUPABASE_URL` não está configurada — aceita qualquer credencial
-- **Fluxo:** `Login.tsx` → `signIn()` → `AuthContext` → `ProtectedRoute` → rotas protegidas
+- **Fluxo login:** `Login.tsx` → `signIn()` → `AuthContext` → `ProtectedRoute` → rotas protegidas
+- **Fluxo cadastro:** `Login.tsx` → dialog "Criar Conta" → `signUp(email, password, displayName)` → email de confirmação (PT-BR com branding Zenite) → redirect para `zenite-app.vercel.app`
 - **Token:** JWT injetado automaticamente via client Supabase
-- **Perfis:** Tabela `profiles` vinculada a auth.users, auto-criada via trigger no signup
+- **Perfis:** Tabela `profiles` vinculada a auth.users, auto-criada via trigger `handle_new_user()` — usa `raw_user_meta_data ->> 'display_name'` com fallback para prefixo do email
 - **Avatar:** Bucket `avatars` no Supabase Storage
+- **Redirect URL:** `https://zenite-app.vercel.app` (configurado no Supabase)
+- **Templates de email:** Todos em PT-BR (confirmação, recuperação, convite, magic link, reautenticação)
 
 ### Usuários Cadastrados
 
@@ -458,15 +461,16 @@ bun preview       # Preview da build de produção
 2. **Testes** — apenas placeholder; sem cobertura real
 3. **Playwright** — configurado mas sem testes E2E escritos
 4. **Dois sistemas de toast** — shadcn/ui Toaster e Sonner coexistem; o código usa Sonner majoritariamente
-5. **Dashboard** — métricas computadas em memória a partir de `alunosApi.list()`, não de query dedicada no banco
-6. **Students.tsx** — filtros multi-select (série, turno, status) + ordenação por coluna; PDF gera lista filtrada
+5. **Dashboard** — métricas computadas em memória a partir de `alunosApi.list()`; gráficos de série e gênero usam `currentYearActiveStudents` (alunos com matrícula ativa no ano letivo atual)
+6. **Students.tsx** — filtros multi-select (série, turno, status) + ordenação por coluna; PDF gera lista filtrada; filtros preservados via `sessionStorage` ao navegar para perfil e voltar
 7. **Matrícula CRUD** —StudentProfile.tsx tem edição e exclusão de matrículas via dialog e AlertDialog
 8. **Importação .docx** — módulo completo com drag-and-drop, parser regex, 4 abas de edição e vínculo automático de matrícula
 9. **Sidebar** — sempre colapsada (48px), sem toggle, hover laranja, ícones centralizados verticalmente
 10. **Branding** — cores navy #01182C + orange #EF7F2D, logo no header, título "I. I. Tia Neuma"
 11. **Confirmações destrutivas** — AlertsDialog em excluir aluno (Students, StudentProfile), excluir matrícula (StudentProfile) e excluir produto (Products)
-12. **Dashboard real** — badges de tendência calculados de `enrollmentByYear` (year-over-year); não renderiza quando não há base histórica
+12. **Dashboard real** — badges de tendência calculados de `enrollmentByYear` (year-over-year); não renderiza quando não há base histórica; gráficos de série e gênero filtram por matrícula ativa no ano letivo atual
 13. **A11y** — `autoComplete` em inputs de email/senha, `aria-label` em botões-ícone, `prefers-reduced-motion` respeitado em animações
 14. **Toaster único** — apenas Sonner (shadcn `Toaster` removido em `App.tsx`)
-15. **Constantes centralizadas** — `src/lib/constants.ts` exporta `GRADES`, `SHIFTS`, `STATUSES`, `RACES`, `YEAR_RANGE`, `SCHOOL_NAME`
+15. **Constantes centralizadas** — `src/lib/constants.ts` exporta `GRADES`, `SHIFTS` (Manhã/Tarde), `STATUSES`, `RACES`, `YEAR_RANGE`, `SCHOOL_NAME`, `CURRENT_YEAR`
+16. **Turno Integral removido** — escola só tem Manhã e Tarde; removido de constants, api, Dashboard, StudentForm e docxParser
 16. **Importer .docx** — botão "Baixar modelo .docx" + lista de campos reconhecidos na própria página

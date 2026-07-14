@@ -1,6 +1,6 @@
 export const GRADES = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"] as const;
 
-export const SHIFTS = ["Manhã", "Tarde", "Integral"] as const;
+export const SHIFTS = ["Manhã", "Tarde"] as const;
 
 export const STATUSES = ["Ativo", "Inativo"] as const;
 

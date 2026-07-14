@@ -105,7 +105,7 @@ function parseCoursesSection(text: string): ParsedStudent["matriculas"] {
   const matriculas: ParsedStudent["matriculas"] = [];
 
   const courseRegex =
-    /Curso:\s*(.+?)\s*Ano\s*:?\s*(\d{4})?\s*Turno\s*:?\s*(Manhã|Tarde|Integral|Manha)?\s*Matriculado\s*\(?a\)?\s*em\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})?/gi;
+    /Curso:\s*(.+?)\s*Ano\s*:?\s*(\d{4})?\s*Turno\s*:?\s*(Manhã|Tarde|Manha)?\s*Matriculado\s*\(?a\)?\s*em\s*:?\s*(\d{1,2}\/\d{1,2}\/\d{4})?/gi;
 
   let match;
   while ((match = courseRegex.exec(text)) !== null) {

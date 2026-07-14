@@ -28,13 +28,13 @@ import { cn } from "@/lib/utils";
 import { GRADES } from "@/lib/constants";
 
 const grades = GRADES;
-const shifts = ["Manhã", "Tarde", "Integral"] as const;
+const shifts = ["Manhã", "Tarde"] as const;
 const racas = ["Branca", "Preta", "Parda", "Amarela", "Indígena", "Não declarada"];
 
 const studentSchema = z.object({
   nome: z.string().min(3, "Nome deve ter ao menos 3 caracteres").max(100),
   serie: z.string().min(1, "Selecione a série"),
-  turno: z.enum(["Manhã", "Tarde", "Integral"]),
+  turno: z.enum(["Manhã", "Tarde"]),
   datanascimento: z.string().min(1, "Campo obrigatório"),
   responsavelfinanceiro: z.string().min(1, "Campo obrigatório"),
   cpfrespfin: z.string().min(1, "Campo obrigatório"),
@@ -289,7 +289,7 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
                 </div>
                 <div>
                   <Label>Turno *</Label>
-                  <Select value={turnoVal} onValueChange={(v) => setValue("turno", v as "Manhã" | "Tarde" | "Integral")}>
+                  <Select value={turnoVal} onValueChange={(v) => setValue("turno", v as "Manhã" | "Tarde")}>
                     <SelectTrigger className={getFieldClass("turno")}><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
                       {shifts.map((s) => (<SelectItem key={s} value={s}>{s}</SelectItem>))}

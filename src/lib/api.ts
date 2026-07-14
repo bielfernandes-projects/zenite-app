@@ -64,7 +64,6 @@ export interface DashboardMetrics {
   alunos_inadimplentes: number;
   alunos_manhã: number;
   alunos_tarde: number;
-  alunos_integral: number;
   por_serie: { serie: string; count: number }[];
 }
 
@@ -136,7 +135,6 @@ export const dashboardApi = {
       alunos_inadimplentes: 0,
       alunos_manhã: active.filter((a) => a.turno === "Manhã").length,
       alunos_tarde: active.filter((a) => a.turno === "Tarde").length,
-      alunos_integral: active.filter((a) => a.turno === "Integral").length,
       por_serie: Array.from(porSerieMap.entries()).map(([serie, count]) => ({ serie, count })),
     } as DashboardMetrics;
   },

@@ -15,7 +15,7 @@ import {
   Legend,
 } from "recharts";
 import { Loader2 } from "lucide-react";
-import { GRADES, SHIFTS, YEAR_RANGE } from "@/lib/constants";
+import { GRADES, SHIFTS, YEAR_RANGE, CURRENT_YEAR } from "@/lib/constants";
 
 export default function Dashboard() {
   const { data: metrics, isLoading, error } = useQuery({
@@ -50,17 +50,32 @@ export default function Dashboard() {
   }, [matriculas]);
 
   const students = (alunosData?.items || []) as AlunoComMatriculas[];
-  const activeStudentsList = students.filter((s) => (s.status || s.situacao) === "Ativo");
   const activeStudents = metrics?.total_alunos_ativos || 0;
   const morningCount = metrics?.alunos_manhã || 0;
   const afternoonCount = metrics?.alunos_tarde || 0;
 
   const seriesOrder = GRADES;
-  const turnoLabel: Record<string, string> = { "Manhã": "M", "Tarde": "T", "Integral": "I" };
+  const turnoLabel: Record<string, string> = { "Manhã": "M", "Tarde": "T" };
 
-  const gradeDistribution = (metrics?.por_serie || []).sort(
-    (a, b) => seriesOrder.indexOf(a.serie) - seriesOrder.indexOf(b.serie)
-  );
+  const currentYearActiveStudents = useMemo(() => {
+    return students.filter((s) => {
+      const matriculas = (s as AlunoComMatriculas).matriculas;
+      if (!matriculas) return false;
+      return matriculas.some((m) => m.status === "Ativo" && m.ano_letivo === CURRENT_YEAR);
+    });
+  }, [students]);
+
+  const gradeDistribution = useMemo(() => {
+    return seriesOrder
+      .map((serie) => ({
+        serie,
+        count: currentYearActiveStudents.filter((s) => {
+          const mat = getMatriculaAtiva(s);
+          return (mat?.serie || s.serie) === serie;
+        }).length,
+      }))
+      .filter((g) => g.count > 0);
+  }, [currentYearActiveStudents, seriesOrder]);
 
   const totalEnrollments = enrollmentByYear.reduce((sum, m) => sum + m.total, 0);
   const avgEnrollments = Math.round(totalEnrollments / enrollmentByYear.length);
@@ -84,7 +99,7 @@ export default function Dashboard() {
 
   const genderBySerieTurno = seriesOrder.flatMap((serie) =>
     turnosOrder.map((turno) => {
-      const alunos = activeStudentsList.filter((s) => {
+      const alunos = currentYearActiveStudents.filter((s) => {
         const mat = getMatriculaAtiva(s);
         return (mat?.serie || s.serie) === serie && (mat?.turno || s.turno) === turno;
       });
@@ -256,7 +271,7 @@ export default function Dashboard() {
               Por Série
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Distribuição de alunos ativos
+              Distribuição de alunos ativos ({CURRENT_YEAR})
             </p>
           </CardHeader>
           <CardContent className="pt-6">
@@ -306,7 +321,7 @@ export default function Dashboard() {
                   Alunos por Gênero, Série e Turno
                 </CardTitle>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Distribuição de alunos e alunas ativos
+                  Distribuição de alunos e alunas ativos ({CURRENT_YEAR})
                 </p>
               </div>
             </div>
