@@ -123,19 +123,20 @@ export const dashboardApi = {
     if (error) throw error;
 
     const all = (alunos || []) as Aluno[];
+    const active = all.filter((a) => (a.status || a.situacao) === "Ativo");
 
     const porSerieMap = new Map<string, number>();
-    all.forEach((a) => {
+    active.forEach((a) => {
       const serie = a.serie || "Sem série";
       porSerieMap.set(serie, (porSerieMap.get(serie) || 0) + 1);
     });
 
     return {
-      total_alunos_ativos: all.filter((a) => (a.status || a.situacao) === "Ativo").length,
+      total_alunos_ativos: active.length,
       alunos_inadimplentes: 0,
-      alunos_manhã: all.filter((a) => a.turno === "Manhã").length,
-      alunos_tarde: all.filter((a) => a.turno === "Tarde").length,
-      alunos_integral: all.filter((a) => a.turno === "Integral").length,
+      alunos_manhã: active.filter((a) => a.turno === "Manhã").length,
+      alunos_tarde: active.filter((a) => a.turno === "Tarde").length,
+      alunos_integral: active.filter((a) => a.turno === "Integral").length,
       por_serie: Array.from(porSerieMap.entries()).map(([serie, count]) => ({ serie, count })),
     } as DashboardMetrics;
   },

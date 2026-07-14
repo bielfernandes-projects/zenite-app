@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
-import { Users, GraduationCap, Sun, TrendingUp, ArrowUpRight } from "lucide-react";
+import { Users, GraduationCap, Sun, Sunset, TrendingUp, ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { dashboardApi, alunosApi, matriculasApi, Matricula, AlunoComMatriculas, getMatriculaAtiva } from "@/lib/api";
@@ -50,6 +50,7 @@ export default function Dashboard() {
   }, [matriculas]);
 
   const students = (alunosData?.items || []) as AlunoComMatriculas[];
+  const activeStudentsList = students.filter((s) => (s.status || s.situacao) === "Ativo");
   const activeStudents = metrics?.total_alunos_ativos || 0;
   const morningCount = metrics?.alunos_manhã || 0;
   const afternoonCount = metrics?.alunos_tarde || 0;
@@ -83,7 +84,7 @@ export default function Dashboard() {
 
   const genderBySerieTurno = seriesOrder.flatMap((serie) =>
     turnosOrder.map((turno) => {
-      const alunos = students.filter((s) => {
+      const alunos = activeStudentsList.filter((s) => {
         const mat = getMatriculaAtiva(s);
         return (mat?.serie || s.serie) === serie && (mat?.turno || s.turno) === turno;
       });
@@ -211,7 +212,7 @@ export default function Dashboard() {
               <div
                 className="h-full bg-gradient-to-r from-[#EF7F2D] to-[#D96518] rounded-full transition-all duration-500"
                 style={{
-                  width: students.length > 0 ? `${(morningCount / students.length) * 100}%` : '0%',
+                  width: activeStudents > 0 ? `${(morningCount / activeStudents) * 100}%` : '0%',
                 }}
               />
             </div>
@@ -225,7 +226,7 @@ export default function Dashboard() {
               Turno Tarde
             </CardTitle>
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#EF7F2D] to-[#D96518] flex items-center justify-center shadow-md">
-              <Sun className="h-5 w-5 text-white" />
+              <Sunset className="h-5 w-5 text-white" />
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -237,7 +238,7 @@ export default function Dashboard() {
               <div
                 className="h-full bg-gradient-to-r from-[#EF7F2D] to-[#D96518] rounded-full transition-all duration-500"
                 style={{
-                  width: students.length > 0 ? `${(afternoonCount / students.length) * 100}%` : '0%',
+                  width: activeStudents > 0 ? `${(afternoonCount / activeStudents) * 100}%` : '0%',
                 }}
               />
             </div>
@@ -247,60 +248,14 @@ export default function Dashboard() {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Enrollments Chart */}
-        <Card className="lg:col-span-2 border-none shadow-lg animate-slide-up">
-          <CardHeader className="border-b border-border">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-lg font-semibold text-foreground">
-                  Evolução de Matrículas
-                </CardTitle>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Total de alunos por ano letivo
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={enrollmentByYear}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(150, 12%, 88%)" vertical={false} />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 14, fontWeight: 600, fill: "hsl(156, 10%, 42%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 12, fill: "hsl(156, 10%, 42%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: "0.75rem",
-                    border: "1px solid hsl(150, 12%, 88%)",
-                    fontSize: "0.875rem",
-                    backgroundColor: "hsl(0, 0%, 100%)",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                  }}
-                  formatter={(value: number) => [value, "Alunos"]}
-                />
-                <Bar dataKey="total" fill="#01182C" name="Matrículas" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
         {/* Grade Distribution */}
-        <Card className="border-none shadow-lg animate-slide-up" style={{ animationDelay: '0.1s' }}>
+        <Card className="border-none shadow-lg animate-slide-up">
           <CardHeader className="border-b border-border">
             <CardTitle className="text-lg font-semibold text-foreground">
               Por Série
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">
-              Distribuição de alunos
+              Distribuição de alunos ativos
             </p>
           </CardHeader>
           <CardContent className="pt-6">
@@ -315,7 +270,7 @@ export default function Dashboard() {
                     <span className="font-medium text-foreground">{g.serie}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-muted-foreground">
-                        {students.length > 0 ? Math.round((g.count / students.length) * 100) : 0}%
+                        {activeStudents > 0 ? Math.round((g.count / activeStudents) * 100) : 0}%
                       </span>
                       <Badge variant="secondary" className="bg-primary/10 text-primary">
                         {g.count}
@@ -326,7 +281,7 @@ export default function Dashboard() {
                     <div
                       className="h-full bg-gradient-to-r from-primary to-[#01182C]/80 rounded-full transition-all duration-700 ease-out group-hover:brightness-110"
                       style={{
-                        width: students.length > 0 ? `${(g.count / students.length) * 100}%` : '0%',
+                        width: activeStudents > 0 ? `${(g.count / activeStudents) * 100}%` : '0%',
                       }}
                     />
                   </div>
@@ -340,76 +295,122 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Gender by Serie & Turno */}
+        <Card className="lg:col-span-2 border-none shadow-lg animate-slide-up">
+          <CardHeader className="border-b border-border">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-semibold text-foreground">
+                  Alunos por Gênero, Série e Turno
+                </CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Distribuição de alunos e alunas ativos
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {genderBySerieTurno.length > 0 ? (
+              <ResponsiveContainer width="100%" height={350}>
+                <BarChart data={genderBySerieTurno}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(150, 12%, 88%)" vertical={false} />
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 11, fill: "hsl(156, 10%, 42%)" }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 12, fill: "hsl(156, 10%, 42%)" }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: "0.75rem",
+                      border: "1px solid hsl(150, 12%, 88%)",
+                      fontSize: "0.875rem",
+                      backgroundColor: "hsl(0, 0%, 100%)",
+                      boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                    }}
+                    formatter={(value: number, name: string) => [
+                      value,
+                      name === "masculino" ? "Masculino" : "Feminino",
+                    ]}
+                  />
+                  <Legend
+                    formatter={(value: string) => value === "masculino" ? "Masculino" : "Feminino"}
+                  />
+                  <Bar
+                    stackId="a"
+                    dataKey="masculino"
+                    fill="#01182C"
+                    name="masculino"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    stackId="a"
+                    dataKey="feminino"
+                    fill="#EF7F2D"
+                    name="feminino"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="text-muted-foreground text-sm text-center py-8">
+                Nenhum dado disponível
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Gender by Serie & Turno */}
+      {/* Enrollments Evolution Chart */}
       <Card className="border-none shadow-lg animate-slide-up">
         <CardHeader className="border-b border-border">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg font-semibold text-foreground">
-                Alunos por Gênero, Série e Turno
+                Evolução de Matrículas
               </CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Distribuição de alunos e alunas
+                Total de alunos por ano letivo
               </p>
             </div>
           </div>
         </CardHeader>
         <CardContent className="pt-6">
-          {genderBySerieTurno.length > 0 ? (
-            <ResponsiveContainer width="100%" height={350}>
-              <BarChart data={genderBySerieTurno}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(150, 12%, 88%)" vertical={false} />
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 11, fill: "hsl(156, 10%, 42%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 12, fill: "hsl(156, 10%, 42%)" }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    borderRadius: "0.75rem",
-                    border: "1px solid hsl(150, 12%, 88%)",
-                    fontSize: "0.875rem",
-                    backgroundColor: "hsl(0, 0%, 100%)",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                  }}
-                  formatter={(value: number, name: string) => [
-                    value,
-                    name === "masculino" ? "Masculino" : "Feminino",
-                  ]}
-                />
-                <Legend
-                  formatter={(value: string) => value === "masculino" ? "Masculino" : "Feminino"}
-                />
-                <Bar
-                  stackId="a"
-                  dataKey="masculino"
-                  fill="#01182C"
-                  name="masculino"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  stackId="a"
-                  dataKey="feminino"
-                  fill="#EF7F2D"
-                  name="feminino"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="text-muted-foreground text-sm text-center py-8">
-              Nenhum dado disponível
-            </p>
-          )}
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={enrollmentByYear}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(150, 12%, 88%)" vertical={false} />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: 14, fontWeight: 600, fill: "hsl(156, 10%, 42%)" }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fontSize: 12, fill: "hsl(156, 10%, 42%)" }}
+                axisLine={false}
+                tickLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: "0.75rem",
+                  border: "1px solid hsl(150, 12%, 88%)",
+                  fontSize: "0.875rem",
+                  backgroundColor: "hsl(0, 0%, 100%)",
+                  boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+                }}
+                formatter={(value: number) => [value, "Alunos"]}
+              />
+              <Bar dataKey="total" fill="#01182C" name="Matrículas" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </CardContent>
       </Card>
     </div>
