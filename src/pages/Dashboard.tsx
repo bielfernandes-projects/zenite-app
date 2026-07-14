@@ -26,7 +26,7 @@ export default function Dashboard() {
 
   const { data: alunosData } = useQuery({
     queryKey: ["alunos", "all"],
-    queryFn: () => alunosApi.list({ limit: 1000 }),
+    queryFn: () => alunosApi.list({ limit: 1000, withMatriculas: true }),
     refetchOnMount: "always",
   });
 
@@ -132,7 +132,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8 max-w-7xl">
+    <div className="space-y-8">
       {/* Header */}
       <div className="space-y-2 animate-slide-up">
         <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>

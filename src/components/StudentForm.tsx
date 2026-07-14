@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -179,6 +179,7 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
   const racaVal = watch("raça");
 
   useEffect(() => {
+    setActiveTab("dados");
     if (student) {
       reset({
         nome: student.nome,
@@ -239,11 +240,41 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
     }
   }, [student, open]);
 
+  const [activeTab, setActiveTab] = useState("dados");
+
   const onSubmit = (data: StudentFormData) => {
     if (student) {
       updateMutation.mutate({ id: student.id, data });
     } else {
       createMutation.mutate(data);
+    }
+  };
+
+  const fieldToTab: Record<string, string> = {
+    nome: "dados", datanascimento: "dados", genero: "dados", serie: "dados",
+    turno: "dados", datadamatricula: "dados", anodamatricula: "dados",
+    ano_letivo: "dados", status: "dados", naturalidade: "dados",
+    cidade: "dados", estado: "dados", raça: "dados",
+    valormensalidade: "dados", datadovencimento: "dados",
+    nomedopai: "filiacao", rgdopai: "filiacao", cpfdopai: "filiacao",
+    nomedamae: "filiacao", rgmae: "filiacao", cpfmae: "filiacao",
+    responsavelfinanceiro: "filiacao", cpfrespfin: "filiacao", rgrespfin: "filiacao",
+    nomedocartorio: "filiacao", numerodotermo: "filiacao", livro: "filiacao",
+    folha: "filiacao", matriculadocartorio: "filiacao", possuiirmao: "filiacao",
+    nomeirmao: "filiacao", datanascimentoresponsavelfin: "filiacao",
+    filiacaoresponsavelfin: "filiacao",
+    telefone1: "contato", nometelefone1: "contato", telefone2: "contato",
+    nometelefone2: "contato", telefone3: "contato", nometelefone3: "contato",
+    logradouro: "contato", numero: "contato", complemento: "contato",
+    bairro: "contato", cep: "contato", cidadetelefone: "contato",
+    estadotelefone: "contato",
+    rg: "documentos", cpf: "documentos", nis: "documentos", cia: "documentos",
+  };
+
+  const onInvalid = () => {
+    const firstError = Object.keys(errors)[0];
+    if (firstError && fieldToTab[firstError]) {
+      setActiveTab(fieldToTab[firstError]);
     }
   };
 
@@ -261,8 +292,8 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
           </SheetTitle>
         </SheetHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6">
-          <Tabs defaultValue="dados" className="w-full">
+        <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="mt-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="dados">Dados Pessoais</TabsTrigger>
               <TabsTrigger value="filiacao">Filiação</TabsTrigger>
