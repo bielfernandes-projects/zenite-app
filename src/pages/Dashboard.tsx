@@ -158,7 +158,7 @@ export default function Dashboard() {
               ) : null}
             </div>
             <p className="text-xs text-muted-foreground">
-              de {students.length} matriculados
+              de {activeStudents} matriculados
             </p>
           </CardContent>
         </Card>
