@@ -37,6 +37,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    const safetyTimeout = setTimeout(() => {
+      if (!cancelled) {
+        if (import.meta.env.DEV) console.warn("AuthProvider: safety timeout reached, forcing loading=false");
+        setLoading(false);
+      }
+    }, 3000);
 
     (async () => {
       try {
@@ -52,7 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         if (import.meta.env.DEV) console.error("AuthProvider.getSession error:", e);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          clearTimeout(safetyTimeout);
+          setLoading(false);
+        }
       }
     })();
 
@@ -71,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, []);
