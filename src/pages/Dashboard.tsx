@@ -56,7 +56,7 @@ export default function Dashboard() {
   const afternoonCount = metrics?.alunos_tarde || 0;
 
   const seriesOrder = GRADES;
-  const turnoLabel: Record<string, string> = { "Manhã": "Manhã", "Tarde": "Tarde", "Integral": "Integral" };
+  const turnoLabel: Record<string, string> = { "Manhã": "M", "Tarde": "T", "Integral": "I" };
 
   const gradeDistribution = (metrics?.por_serie || []).sort(
     (a, b) => seriesOrder.indexOf(a.serie) - seriesOrder.indexOf(b.serie)
@@ -90,13 +90,14 @@ export default function Dashboard() {
       });
       const masculino = alunos.filter((s) => s.genero === "Masculino").length;
       const feminino = alunos.filter((s) => s.genero === "Feminino").length;
+      const shortSerie = serie.replace("º Ano", "º");
       return {
-        name: `${serie} - ${turnoLabel[turno]}`,
+        name: `${shortSerie}-${turnoLabel[turno]}`,
         masculino,
         feminino,
         total: masculino + feminino,
       };
-    }).filter((item) => item.total > 0)
+    })
   );
 
   if (isLoading) {

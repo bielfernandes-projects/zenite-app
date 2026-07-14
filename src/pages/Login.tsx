@@ -60,7 +60,7 @@ export default function Login() {
 
     setSignUpLoading(true);
 
-    const { error } = await signUp(signUpEmail, signUpPassword);
+    const { error } = await signUp(signUpEmail, signUpPassword, signUpName || undefined);
 
     if (error) {
       toast.error(error.message || "Não foi possível criar a conta. Tente novamente.");
