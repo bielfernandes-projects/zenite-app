@@ -378,7 +378,7 @@ Funcionam combinadas e em qualquer parte do texto. A formatação é renderizada
 
 - **jsPDF** para criação do documento PDF
 - **renderFormattedParagraph()** processa as tags `<b>`, `<i>`, `<u>` e renderiza com fontes corretas
-- **Cabeçalho fixo** com dados da escola (logo, endereço, CNPJ, INEP)
+- **Cabeçalho fixo** com dados da escola (logo, endereço, CNPJ, INEP, site) — fonte 12/11/10pt
 - **Assinatura opcional** no rodapé (configurável por template)
 
 ## Design System
@@ -461,10 +461,10 @@ bun preview       # Preview da build de produção
 2. **Testes** — apenas placeholder; sem cobertura real
 3. **Playwright** — configurado mas sem testes E2E escritos
 4. **Dois sistemas de toast** — shadcn/ui Toaster e Sonner coexistem; o código usa Sonner majoritariamente
-5. **Dashboard** — métricas computadas em memória a partir de `alunosApi.list()`; gráficos de série e gênero usam `currentYearActiveStudents` (alunos com matrícula ativa no ano letivo atual)
+5. **Dashboard** — métricas computadas em memória a partir de `alunosApi.list()`; gráficos de série e gênero usam `currentYearActiveStudents` (alunos com matrícula ativa no ano letivo atual); legenda "Não informado" (cinza) aparece apenas quando há alunos com gênero não informado; colunas vazias (total=0) são filtradas
 6. **Students.tsx** — filtros multi-select (série, turno, status) + ordenação por coluna; PDF gera lista filtrada; filtros preservados via `sessionStorage` ao navegar para perfil e voltar
 7. **Matrícula CRUD** —StudentProfile.tsx tem edição e exclusão de matrículas via dialog e AlertDialog
-8. **Importação .docx** — módulo completo com drag-and-drop, parser regex, 4 abas de edição e vínculo automático de matrícula
+8. **Importação .docx** — módulo completo com drag-and-drop, parser regex, 4 abas de edição e vínculo automático de matrícula; todos os campos de nome são capitalizados automaticamente (primeira maiúscula)
 9. **Sidebar** — sempre colapsada (48px), sem toggle, hover laranja, ícones centralizados verticalmente
 10. **Branding** — cores navy #01182C + orange #EF7F2D, logo no header, título "I. I. Tia Neuma"
 11. **Confirmações destrutivas** — AlertsDialog em excluir aluno (Students, StudentProfile), excluir matrícula (StudentProfile) e excluir produto (Products)
@@ -473,4 +473,4 @@ bun preview       # Preview da build de produção
 14. **Toaster único** — apenas Sonner (shadcn `Toaster` removido em `App.tsx`)
 15. **Constantes centralizadas** — `src/lib/constants.ts` exporta `GRADES`, `SHIFTS` (Manhã/Tarde), `STATUSES`, `RACES`, `YEAR_RANGE`, `SCHOOL_NAME`, `CURRENT_YEAR`
 16. **Turno Integral removido** — escola só tem Manhã e Tarde; removido de constants, api, Dashboard, StudentForm e docxParser
-16. **Importer .docx** — botão "Baixar modelo .docx" + lista de campos reconhecidos na própria página
+17. **Importer .docx** — botão "Baixar modelo .docx" + lista de campos reconhecidos na própria página

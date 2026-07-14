@@ -101,6 +101,10 @@ function cleanValue(v: string | undefined): string | undefined {
   return trimmed;
 }
 
+function toTitleCase(str: string): string {
+  return str.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
 function parseCoursesSection(text: string): ParsedStudent["matriculas"] {
   const matriculas: ParsedStudent["matriculas"] = [];
 
@@ -129,9 +133,9 @@ function parseSingleForm(text: string): ParsedStudent {
     matriculas: [],
   };
 
-  student.nome = cleanValue(
+  student.nome = toTitleCase(cleanValue(
     text.match(/Aluno\(a\):\s*(.+?)(?=\s*Data de nascimento)/i)?.[1]
-  ) || "";
+  ) || "");
 
   student.datanascimento = cleanValue(
     text.match(/Data de nascimento:\s*(.+?)(?=\s*Naturalidade)/i)?.[1]
@@ -180,9 +184,9 @@ function parseSingleForm(text: string): ParsedStudent {
     student.cor = corMatch[1].replace(/^O\s+/, "").trim();
   }
 
-  student.nomedopai = cleanValue(
+  student.nomedopai = toTitleCase(cleanValue(
     text.match(/Nome do Pai:\s*(.+?)(?=\s*RG)/i)?.[1]
-  );
+  ) || "");
 
   const rgsAfterPai = text.match(/Nome do Pai:.+?RG:\s*(.+?)(?=\s*CPF)/is)?.[1];
   if (rgsAfterPai && !rgsAfterPai.includes("RESP.")) {
@@ -194,26 +198,26 @@ function parseSingleForm(text: string): ParsedStudent {
     student.cpfdopai = cleanValue(cpfsAfterPai.match(/[\d.]+-?\d+/)?.[0]);
   }
 
-  student.nomedamae = cleanValue(
+  student.nomedamae = toTitleCase(cleanValue(
     text.match(/Nome d[ao]\s*Mãe:\s*(.+?)(?=\s*RG)/i)?.[1]
-  );
+  ) || "");
 
   const rgsAfterMae = text.match(/Nome d[ao]\s*Mãe:.+?RG:\s*(.+?)(?=\s*CPF)/is)?.[1];
   if (rgsAfterMae && !rgsAfterMae.includes("RESP.")) {
     student.rgmae = cleanValue(rgsAfterMae);
   }
 
-  student.responsavelfinanceiro = cleanValue(
+  student.responsavelfinanceiro = toTitleCase(cleanValue(
     text.match(/RESP(?:ONSIVO)?\.?\s*FINANCEIRO\s*:?\s*(.+?)(?=\s*Nascimento)/i)?.[1]
-  );
+  ) || "");
 
   student.datanascimentoresponsavelfin = cleanValue(
     text.match(/(?<!de )nascimento:\s*(.+?)(?=\s*filiação)/i)?.[1]
   );
 
-  student.filiacaoresponsavelfin = cleanValue(
+  student.filiacaoresponsavelfin = toTitleCase(cleanValue(
     text.match(/Filiação:\s*(.+?)(?=\s*RG)/i)?.[1]
-  );
+  ) || "");
 
   const rgsAfterResp = text.match(/Filiação:.+?RG\s*:?\s*(.+?)(?=\s*CPF)/is)?.[1];
   if (rgsAfterResp) {

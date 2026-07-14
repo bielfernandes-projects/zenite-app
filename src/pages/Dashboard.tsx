@@ -118,6 +118,8 @@ export default function Dashboard() {
     .filter((item) => item.total > 0)
   );
 
+  const hasNaoInformado = genderBySerieTurno.some((item) => item.naoInformado > 0);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -375,13 +377,15 @@ export default function Dashboard() {
                     fill="#EF7F2D"
                     name="feminino"
                   />
-                  <Bar
-                    stackId="a"
-                    dataKey="naoInformado"
-                    fill="#94a3b8"
-                    name="naoInformado"
-                    radius={[4, 4, 0, 0]}
-                  />
+                  {hasNaoInformado && (
+                    <Bar
+                      stackId="a"
+                      dataKey="naoInformado"
+                      fill="#94a3b8"
+                      name="naoInformado"
+                      radius={[4, 4, 0, 0]}
+                    />
+                  )}
                 </BarChart>
               </ResponsiveContainer>
             ) : (

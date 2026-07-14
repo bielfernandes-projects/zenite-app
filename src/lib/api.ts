@@ -514,14 +514,14 @@ export async function gerarDocumentoPDF(titulo: string, corpo: string, tituloImp
 
   doc.setTextColor(0, 0, 0);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
+  doc.setFontSize(12);
   doc.text("INSTITUTO INFANTIL TIA NEUMA", textX, 19);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(12);
+  doc.setFontSize(11);
   doc.text("Educação Infantil e Ensino Fundamental I", textX, 24);
 
-  doc.setFontSize(11);
+  doc.setFontSize(10);
   doc.text("Rua: Alameda Ana Elisa, 133, Quadra 2, Cidade 2000 - Fortaleza-CE", textX, 29);
 
   doc.text("Telefone: (85) 3212.1112", textX, 34);
@@ -531,6 +531,8 @@ export async function gerarDocumentoPDF(titulo: string, corpo: string, tituloImp
 
   doc.text("INEP: 23075112", textX, 44);
   doc.text("CNPJ: 05.813.399.0001-43", textX + 45, 44);
+
+  doc.text("Site: www.escolatianeuma.com.br", textX, 49);
 
   let y = 65;
 
@@ -597,18 +599,19 @@ export async function gerarFichaAlunoPDF(aluno: Aluno, matriculas: Matricula[]):
 
   doc.setTextColor(0, 0, 0);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
+  doc.setFontSize(12);
   doc.text("INSTITUTO INFANTIL TIA NEUMA", textX, 19);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(12);
-  doc.text("Educação Infantil e Ensino Fundamental I", textX, 24);
   doc.setFontSize(11);
+  doc.text("Educação Infantil e Ensino Fundamental I", textX, 24);
+  doc.setFontSize(10);
   doc.text("Rua: Alameda Ana Elisa, 133, Quadra 2, Cidade 2000 - Fortaleza-CE", textX, 29);
   doc.text("Telefone: (85) 3212.1112", textX, 34);
   doc.text("WhatsApp: (85) 9 9292-5662", textX + 45, 34);
   doc.text("E-mail: institutotianeuma@gmail.com", textX, 39);
   doc.text("INEP: 23075112", textX, 44);
   doc.text("CNPJ: 05.813.399.0001-43", textX + 45, 44);
+  doc.text("Site: www.escolatianeuma.com.br", textX, 49);
 
   let y = 65;
 
