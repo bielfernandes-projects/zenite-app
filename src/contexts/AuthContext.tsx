@@ -36,28 +36,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const r = await fetchRole(session.user.id);
-        setRole(r);
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          const r = await fetchRole(session.user.id);
+          if (cancelled) return;
+          setRole(r);
+        }
+      } catch (e) {
+        if (import.meta.env.DEV) console.error("AuthProvider.getSession error:", e);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-      setLoading(false);
-    });
+    })();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (cancelled) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         const r = await fetchRole(session.user.id);
+        if (cancelled) return;
         setRole(r);
       } else {
         setRole(null);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
