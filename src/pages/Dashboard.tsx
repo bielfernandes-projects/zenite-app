@@ -105,14 +105,17 @@ export default function Dashboard() {
       });
       const masculino = alunos.filter((s) => s.genero === "Masculino").length;
       const feminino = alunos.filter((s) => s.genero === "Feminino").length;
+      const naoInformado = alunos.length - masculino - feminino;
       const shortSerie = serie.replace("º Ano", "º");
       return {
         name: `${shortSerie}-${turnoLabel[turno]}`,
         masculino,
         feminino,
-        total: masculino + feminino,
+        naoInformado,
+        total: masculino + feminino + naoInformado,
       };
     })
+    .filter((item) => item.total > 0)
   );
 
   if (isLoading) {
@@ -351,13 +354,13 @@ export default function Dashboard() {
                       backgroundColor: "hsl(0, 0%, 100%)",
                       boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
                     }}
-                    formatter={(value: number, name: string) => [
-                      value,
-                      name === "masculino" ? "Masculino" : "Feminino",
-                    ]}
+                    formatter={(value: number, name: string) => {
+                      const labels: Record<string, string> = { masculino: "Masculino", feminino: "Feminino", naoInformado: "Não informado" };
+                      return [value, labels[name] || name];
+                    }}
                   />
                   <Legend
-                    formatter={(value: string) => value === "masculino" ? "Masculino" : "Feminino"}
+                    formatter={(value: string) => value === "masculino" ? "Masculino" : value === "feminino" ? "Feminino" : "Não informado"}
                   />
                   <Bar
                     stackId="a"
@@ -371,6 +374,12 @@ export default function Dashboard() {
                     dataKey="feminino"
                     fill="#EF7F2D"
                     name="feminino"
+                  />
+                  <Bar
+                    stackId="a"
+                    dataKey="naoInformado"
+                    fill="#94a3b8"
+                    name="naoInformado"
                     radius={[4, 4, 0, 0]}
                   />
                 </BarChart>
