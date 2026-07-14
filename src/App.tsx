@@ -15,6 +15,7 @@ import ImportStudents from "./pages/ImportStudents";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import AdminUsers from "./pages/AdminUsers";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,14 @@ function AppRoutes() {
                 <Route path="/perfil" element={<Profile />} />
                 <Route path="/financeiro/produtos" element={<Products />} />
                 <Route path="/financeiro/vendas" element={<Sales />} />
+                <Route
+                  path="/admin/usuarios"
+                  element={
+                    <ProtectedRoute roles={["admin"]}>
+                      <AdminUsers />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </AppLayout>

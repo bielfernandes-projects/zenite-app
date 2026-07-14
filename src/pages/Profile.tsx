@@ -27,7 +27,7 @@ export default function ProfilePage() {
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile", user?.id],
-    queryFn: () => profileApi.get(user!.id),
+    queryFn: () => profileApi.get(),
     enabled: !!user?.id,
   });
 
@@ -39,7 +39,7 @@ export default function ProfilePage() {
   }, [profile]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: () => profileApi.update(user!.id, { display_name: displayName }),
+    mutationFn: () => profileApi.update({ display_name: displayName }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["profile", user?.id] });
       toast.success("Perfil atualizado com sucesso!");
@@ -48,7 +48,7 @@ export default function ProfilePage() {
   });
 
   const uploadAvatarMutation = useMutation({
-    mutationFn: (file: File) => profileApi.uploadAvatar(user!.id, file),
+    mutationFn: (file: File) => profileApi.uploadAvatar(file),
     onSuccess: (url) => {
       setAvatarPreview(url);
       setSelectedFile(null);

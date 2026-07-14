@@ -2,6 +2,9 @@
 
 > Sistema de Gestão Escolar — Instituto Infantil Tia Neuma
 
+## Versão
+2.0 — Auditoria de segurança e LGPD aplicada em 2026-07-14.
+
 ## Visão Geral
 
 Frontend SPA (Single Page Application) que se conecta diretamente ao Supabase (PostgreSQL) sem backend intermediário. Usado para gerenciar cadastro de alunos, matrículas, documentos, financeiro e dashboard da escola.
@@ -455,22 +458,49 @@ bun preview       # Preview da build de produção
 - **Build:** `vite build`
 - **Variáveis de ambiente:** configuradas no painel da Vercel
 
+## Migrations (Supabase)
+
+Aplicadas em ordem, versionadas em `supabase/migrations/`:
+
+1. `20260713_create_profiles.sql` — tabela `profiles`, RLS, bucket `avatars`, trigger `handle_new_user`
+2. `20260714_add_role_and_security.sql` — coluna `role` em `profiles`, `is_staff()`, policies restritivas em `alunos`/`matriculas`/`produtos`/`recibos`/`templates_documentos`, endurecimento do bucket `avatars`
+3. `20260714_audit_and_rpcs.sql` — tabela `audit_log` + triggers + RPCs `dashboard_metrics`, `dashboard_por_serie`, `dashboard_genero_serie_turno`, `log_operacao`
+
+## Segurança
+
+- **RLS ativa** em todas as tabelas de dados; policies `staff_*` baseadas em `is_staff()` (que checa `role in ('admin','funcionario')`)
+- **Bucket `avatars` privado** com policies por usuário (`auth.uid()` é dono do path)
+- **CSP** em `vercel.json` restringe scripts, imagens e conexões
+- **HSTS** força HTTPS
+- **Sessão em `sessionStorage`** (não persiste entre abas)
+- **Audit log** registra INSERT/UPDATE/DELETE em `alunos`/`matriculas`/`produtos`/`recibos`/`templates_documentos` + `PDF_GENERATED` via `log_operacao()`
+- **Cadastro público desabilitado** — admin cria usuários pelo painel Supabase
+
 ## Observações e Pendências
 
-1. **Schema do Supabase** — migrações versionadas em `supabase/migrations/`; a última cria a tabela `profiles`
+1. **Schema do Supabase** — migrações versionadas em `supabase/migrations/`
 2. **Testes** — apenas placeholder; sem cobertura real
 3. **Playwright** — configurado mas sem testes E2E escritos
 4. **Dois sistemas de toast** — shadcn/ui Toaster e Sonner coexistem; o código usa Sonner majoritariamente
-5. **Dashboard** — métricas computadas em memória a partir de `alunosApi.list()`; gráficos de série e gênero usam `currentYearActiveStudents` (alunos com matrícula ativa no ano letivo atual); legenda "Não informado" (cinza) aparece apenas quando há alunos com gênero não informado; colunas vazias (total=0) são filtradas
+5. **Dashboard** — métricas via RPCs `dashboard_metrics`, `dashboard_por_serie`, `dashboard_genero_serie_turno`; gráficos filtram por ano letivo atual
 6. **Students.tsx** — filtros multi-select (série, turno, status) + ordenação por coluna; PDF gera lista filtrada; filtros preservados via `sessionStorage` ao navegar para perfil e voltar
 7. **Matrícula CRUD** —StudentProfile.tsx tem edição e exclusão de matrículas via dialog e AlertDialog
-8. **Importação .docx** — módulo completo com drag-and-drop, parser regex, 4 abas de edição e vínculo automático de matrícula; todos os campos de nome são capitalizados automaticamente (primeira maiúscula)
+8. **Importação .docx** — módulo completo com drag-and-drop, parser regex, 4 abas de edição, vínculo automático de matrícula e capitalização automática de nomes
 9. **Sidebar** — sempre colapsada (48px), sem toggle, hover laranja, ícones centralizados verticalmente
 10. **Branding** — cores navy #01182C + orange #EF7F2D, logo no header, título "I. I. Tia Neuma"
-11. **Confirmações destrutivas** — AlertsDialog em excluir aluno (Students, StudentProfile), excluir matrícula (StudentProfile) e excluir produto (Products)
-12. **Dashboard real** — badges de tendência calculados de `enrollmentByYear` (year-over-year); não renderiza quando não há base histórica; gráficos de série e gênero filtram por matrícula ativa no ano letivo atual
+11. **Confirmações destrutivas** — AlertsDialog em excluir aluno (Students, StudentProfile), excluir matrícula (StudentProfile), excluir produto (Products), e em gerar PDF de aluno
+12. **Dashboard real** — badges de tendência calculados de `enrollmentByYear` (year-over-year); não renderiza quando não há base histórica
 13. **A11y** — `autoComplete` em inputs de email/senha, `aria-label` em botões-ícone, `prefers-reduced-motion` respeitado em animações
 14. **Toaster único** — apenas Sonner (shadcn `Toaster` removido em `App.tsx`)
 15. **Constantes centralizadas** — `src/lib/constants.ts` exporta `GRADES`, `SHIFTS` (Manhã/Tarde), `STATUSES`, `RACES`, `YEAR_RANGE`, `SCHOOL_NAME`, `CURRENT_YEAR`
 16. **Turno Integral removido** — escola só tem Manhã e Tarde; removido de constants, api, Dashboard, StudentForm e docxParser
 17. **Importer .docx** — botão "Baixar modelo .docx" + lista de campos reconhecidos na própria página
+18. **Capacetes/Papeis (RBAC)**: tabela `profiles` tem coluna `role` (`admin` | `funcionario`); RLS em todas as tabelas de dados checa `public.is_staff()`; rota `/admin/usuarios` protegida por `ProtectedRoute roles={['admin']}`
+19. **Sessão em sessionStorage** — não persiste entre abas/fechamento (mitiga XSS e roubo de token)
+20. **RPCs de agregação** — `dashboard_metrics(ano)`, `dashboard_por_serie(ano)`, `dashboard_genero_serie_turno(ano)` substituem `select(*)` no Dashboard; PII não trafega para contar
+21. **Projeção em `alunosApi.list()`** — lista retorna apenas campos necessários (sem CPF, RG, NIS, CIA, endereço); apenas `get(id)` retorna tudo
+22. **Audit log** — tabela `audit_log` + trigger em todas as tabelas de dados; geracao de PDF registrada via RPC `log_operacao('PDF_GENERATED', ...)`; LGPD art. 37
+23. **Cabecalhos HTTP** — `vercel.json` define CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+24. **Storage avatars** — bucket `avatars` com policies restritas (so dono escreve/le/apaga); `profileApi.uploadAvatar(file)` obtem `auth.uid()` internamente
+25. **Cadastro publico removido** — `Login.tsx` nao tem botao "Criar Conta"; admin cria usuarios pelo painel Supabase; primeiro login confirma email e profile e criado via trigger `handle_new_user()`
+26. **Confirmation dialog em geracao de PDF** — `StudentProfile.tsx` exige confirmacao antes de gerar ficha do aluno (alinhado com audit log)

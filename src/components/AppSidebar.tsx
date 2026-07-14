@@ -1,4 +1,4 @@
-import { Home, Users, FileText, Upload, LogOut, Package, ShoppingCart } from "lucide-react";
+import { Home, Users, FileText, Upload, LogOut, Package, ShoppingCart, UserCog } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,7 +33,11 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
-  const { signOut } = useAuth();
+  const { signOut, role } = useAuth();
+
+  const adminItems = role === "admin"
+    ? [{ title: "Usuários", url: "/admin/usuarios", icon: UserCog }]
+    : [];
 
   const handleLogout = async () => {
     await signOut();
@@ -91,7 +95,7 @@ export function AppSidebar() {
             <SidebarMenu className={collapsed ? "space-y-2" : "space-y-1 px-3"}>
               {financeiroItems.map((item) => {
                 const isActive = location.pathname.startsWith(item.url);
-                
+
                 return (
                   <SidebarMenuItem key={item.title} className={collapsed ? "flex justify-center" : ""}>
                     <SidebarMenuButton
@@ -114,6 +118,44 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {adminItems.length > 0 && (
+          <>
+            <SidebarSeparator className="mx-4" />
+            <SidebarGroup>
+              {!collapsed && (
+                <SidebarGroupContent>
+                  <div className="px-6 py-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+                      Administração
+                    </p>
+                  </div>
+                </SidebarGroupContent>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu className={collapsed ? "space-y-2" : "space-y-1 px-3"}>
+                  {adminItems.map((item) => {
+                    const isActive = location.pathname.startsWith(item.url);
+                    return (
+                      <SidebarMenuItem key={item.title} className={collapsed ? "flex justify-center" : ""}>
+                        <SidebarMenuButton asChild isActive={isActive} tooltip={collapsed ? item.title : undefined}>
+                          <NavLink
+                            to={item.url}
+                            className={`hover:bg-sidebar-accent/80 rounded-lg ${collapsed ? "w-full flex items-center justify-center px-2" : ""}`}
+                            activeClassName="bg-sidebar-accent text-sidebar-primary-foreground font-medium shadow-md"
+                          >
+                            <item.icon className={`h-4 w-4 ${collapsed ? "mx-auto" : ""}`} />
+                            {!collapsed && <span>{item.title}</span>}
+                          </NavLink>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        )}
       </SidebarContent>
       <SidebarFooter className={`${collapsed ? "p-2" : "p-4"} border-t border-white/10`}>
         <Button

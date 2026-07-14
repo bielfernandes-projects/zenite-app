@@ -58,7 +58,7 @@ export function AppHeader() {
 
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
-    queryFn: () => profileApi.get(user!.id),
+    queryFn: () => profileApi.get(),
     enabled: !!user?.id,
   });
 

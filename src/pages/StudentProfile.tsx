@@ -79,6 +79,7 @@ export default function StudentProfile() {
   const [editingMatricula, setEditingMatricula] = useState<Matricula | null>(null);
   const [deletingMatriculaId, setDeletingMatriculaId] = useState<string | null>(null);
   const [deletingAluno, setDeletingAluno] = useState(false);
+  const [printingFicha, setPrintingFicha] = useState(false);
   const [tabValue, setTabValue] = useState("personal");
 
   const { data: student, isLoading, error } = useQuery({
@@ -220,6 +221,11 @@ export default function StudentProfile() {
     }
   };
 
+  const confirmPrintFicha = () => {
+    setPrintingFicha(false);
+    handlePrintFicha();
+  };
+
   const getStatusBadgeColor = (status: string) => {
     const colors: Record<string, string> = {
       Ativo: "bg-success/10 text-success border-success/20 hover:bg-success/20",
@@ -259,7 +265,7 @@ export default function StudentProfile() {
           Voltar
         </Button>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handlePrintFicha}>
+          <Button variant="outline" size="sm" onClick={() => setPrintingFicha(true)}>
             <Printer className="h-4 w-4 mr-2" />
             Imprimir Ficha
           </Button>
@@ -777,6 +783,24 @@ export default function StudentProfile() {
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : null}
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={printingFicha} onOpenChange={(open) => { if (!open) setPrintingFicha(false); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Gerar ficha de {student?.nome}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Será gerado um PDF com dados pessoais, endereço e filiação.
+              Esta ação fica registrada no log de auditoria.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmPrintFicha}>
+              Gerar PDF
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

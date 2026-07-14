@@ -26,8 +26,8 @@ dist-ssr
 # Environment
 .env
 
-# Supabase CLI temp
-supabase/
+# Supabase CLI temp (mantem migrations versionadas)
+supabase/.temp/
 
 # Impeccable assessment artifacts
 .assessment-b/

@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { Users, GraduationCap, Sun, Sunset, TrendingUp, ArrowUpRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { dashboardApi, alunosApi, matriculasApi, Matricula, AlunoComMatriculas, getMatriculaAtiva } from "@/lib/api";
+import { dashboardApi, matriculasApi, Matricula } from "@/lib/api";
 import {
   BarChart,
   Bar,
@@ -24,15 +24,15 @@ export default function Dashboard() {
     refetchOnMount: "always",
   });
 
-  const { data: alunosData } = useQuery({
-    queryKey: ["alunos", "all"],
-    queryFn: () => alunosApi.list({ limit: 1000, withMatriculas: true }),
-    refetchOnMount: "always",
-  });
-
   const { data: matriculas = [] } = useQuery({
     queryKey: ["matriculas", "all"],
     queryFn: () => matriculasApi.listAll(),
+    refetchOnMount: "always",
+  });
+
+  const { data: generoRows = [] } = useQuery({
+    queryKey: ["dashboard-genero-serie-turno"],
+    queryFn: () => dashboardApi.getGeneroSerieTurno(),
     refetchOnMount: "always",
   });
 
@@ -49,33 +49,22 @@ export default function Dashboard() {
     return data;
   }, [matriculas]);
 
-  const students = (alunosData?.items || []) as AlunoComMatriculas[];
   const activeStudents = metrics?.total_alunos_ativos || 0;
   const morningCount = metrics?.alunos_manhã || 0;
   const afternoonCount = metrics?.alunos_tarde || 0;
 
   const seriesOrder = GRADES;
-  const turnoLabel: Record<string, string> = { "Manhã": "M", "Tarde": "T" };
-
-  const currentYearActiveStudents = useMemo(() => {
-    return students.filter((s) => {
-      const matriculas = (s as AlunoComMatriculas).matriculas;
-      if (!matriculas) return false;
-      return matriculas.some((m) => m.status === "Ativo" && m.ano_letivo === CURRENT_YEAR);
-    });
-  }, [students]);
+  const turnoLabel: Record<string, string> = { Manhã: "M", Tarde: "T" };
 
   const gradeDistribution = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const r of generoRows) {
+      map.set(r.serie, (map.get(r.serie) || 0) + Number(r.masculino) + Number(r.feminino) + Number(r.nao_informado));
+    }
     return seriesOrder
-      .map((serie) => ({
-        serie,
-        count: currentYearActiveStudents.filter((s) => {
-          const mat = getMatriculaAtiva(s);
-          return (mat?.serie || s.serie) === serie;
-        }).length,
-      }))
+      .map((serie) => ({ serie, count: map.get(serie) || 0 }))
       .filter((g) => g.count > 0);
-  }, [currentYearActiveStudents, seriesOrder]);
+  }, [generoRows, seriesOrder]);
 
   const totalEnrollments = enrollmentByYear.reduce((sum, m) => sum + m.total, 0);
   const avgEnrollments = Math.round(totalEnrollments / enrollmentByYear.length);
@@ -97,26 +86,19 @@ export default function Dashboard() {
 
   const turnosOrder = SHIFTS;
 
-  const genderBySerieTurno = seriesOrder.flatMap((serie) =>
-    turnosOrder.map((turno) => {
-      const alunos = currentYearActiveStudents.filter((s) => {
-        const mat = getMatriculaAtiva(s);
-        return (mat?.serie || s.serie) === serie && (mat?.turno || s.turno) === turno;
-      });
-      const masculino = alunos.filter((s) => s.genero === "Masculino").length;
-      const feminino = alunos.filter((s) => s.genero === "Feminino").length;
-      const naoInformado = alunos.length - masculino - feminino;
-      const shortSerie = serie.replace("º Ano", "º");
+  const genderBySerieTurno = generoRows
+    .map((r) => {
+      const shortSerie = r.serie.replace("º Ano", "º");
+      const turno = turnoLabel[r.turno] || r.turno;
       return {
-        name: `${shortSerie}-${turnoLabel[turno]}`,
-        masculino,
-        feminino,
-        naoInformado,
-        total: masculino + feminino + naoInformado,
+        name: `${shortSerie}-${turno}`,
+        masculino: Number(r.masculino),
+        feminino: Number(r.feminino),
+        naoInformado: Number(r.nao_informado),
+        total: Number(r.masculino) + Number(r.feminino) + Number(r.nao_informado),
       };
     })
-    .filter((item) => item.total > 0)
-  );
+    .filter((item) => item.total > 0);
 
   const hasNaoInformado = genderBySerieTurno.some((item) => item.naoInformado > 0);
 

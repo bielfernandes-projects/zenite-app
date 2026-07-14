@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { LOGO_ESCOLA_BASE64, ASSINATURA_BASE64 } from "@/lib/assets";
+import { CURRENT_YEAR } from "@/lib/constants";
 
 export interface Aluno {
   id: string;
@@ -67,9 +68,14 @@ export interface DashboardMetrics {
   por_serie: { serie: string; count: number }[];
 }
 
+const ALUNOS_LIST_FIELDS = "id, nome, genero, serie, turno, situacao, status, ano_letivo, responsavelfinanceiro, nomedamae, telefone1, telefone2, telefone3, criado_em, atualizado_em";
+const MATRICULAS_LIST_FIELDS = "id, aluno_id, ano_letivo, serie, turno, status, data_matricula, created_at";
+
 export const alunosApi = {
   list: async (params?: { page?: number; limit?: number; search?: string; serie?: string; withMatriculas?: boolean }) => {
-    const selectFields = params?.withMatriculas ? "*, matriculas(*)" : "*";
+    const selectFields = params?.withMatriculas
+      ? `${ALUNOS_LIST_FIELDS}, matriculas(${MATRICULAS_LIST_FIELDS})`
+      : ALUNOS_LIST_FIELDS;
     let query = supabase.from("alunos").select(selectFields, { count: "exact" });
 
     if (params?.search) {
@@ -118,27 +124,50 @@ export const alunosApi = {
 
 export const dashboardApi = {
   getMetrics: async () => {
-    const { data: alunos, error } = await supabase.from("alunos").select("*");
+    const { data, error } = await supabase.rpc("dashboard_metrics", { p_ano_letivo: CURRENT_YEAR });
     if (error) throw error;
+    const row = (data as Array<{ total_ativos: number; total_manha: number; total_tarde: number }> | null)?.[0];
 
-    const all = (alunos || []) as Aluno[];
-    const active = all.filter((a) => (a.status || a.situacao) === "Ativo");
-
-    const porSerieMap = new Map<string, number>();
-    active.forEach((a) => {
-      const serie = a.serie || "Sem série";
-      porSerieMap.set(serie, (porSerieMap.get(serie) || 0) + 1);
-    });
+    const { data: porSerieData, error: porSerieError } = await supabase.rpc("dashboard_por_serie", { p_ano_letivo: CURRENT_YEAR });
+    if (porSerieError) throw porSerieError;
+    const porSerie = (porSerieData as Array<{ serie: string; qtd: number }> | null) || [];
 
     return {
-      total_alunos_ativos: active.length,
+      total_alunos_ativos: row?.total_ativos ?? 0,
       alunos_inadimplentes: 0,
-      alunos_manhã: active.filter((a) => a.turno === "Manhã").length,
-      alunos_tarde: active.filter((a) => a.turno === "Tarde").length,
-      por_serie: Array.from(porSerieMap.entries()).map(([serie, count]) => ({ serie, count })),
+      alunos_manhã: row?.total_manha ?? 0,
+      alunos_tarde: row?.total_tarde ?? 0,
+      por_serie: porSerie.map((r) => ({ serie: r.serie, count: Number(r.qtd) })),
     } as DashboardMetrics;
   },
+
+  getGeneroSerieTurno: async () => {
+    const { data, error } = await supabase.rpc("dashboard_genero_serie_turno", { p_ano_letivo: CURRENT_YEAR });
+    if (error) throw error;
+    return (data as Array<{
+      serie: string;
+      turno: string;
+      masculino: number;
+      feminino: number;
+      nao_informado: number;
+    }> | null) || [];
+  },
 };
+
+export async function logOperacao(
+  acao: "PDF_GENERATED" | "LOGIN" | "LOGOUT" | "INSERT" | "UPDATE" | "DELETE",
+  tabela: string,
+  registroId?: string,
+  metadados?: Record<string, unknown>
+) {
+  const { error } = await supabase.rpc("log_operacao", {
+    p_acao: acao,
+    p_tabela: tabela,
+    p_registro_id: registroId ?? null,
+    p_metadados: metadados ?? null,
+  });
+  if (error && import.meta.env.DEV) console.error("Falha ao registrar log de operação:", error);
+}
 
 export interface Produto {
   id: string;
@@ -581,6 +610,8 @@ export async function gerarDocumentoPDF(titulo: string, corpo: string, tituloImp
     doc.text("Diretor Pedagógico", cx, y, { align: "center" });
   }
 
+  void logOperacao("PDF_GENERATED", "templates_documentos", titulo, { titulo_impresso: tituloImpresso });
+
   return doc.output("blob");
 }
 
@@ -717,6 +748,8 @@ export async function gerarFichaAlunoPDF(aluno: Aluno, matriculas: Matricula[]):
     y += 7;
   }
 
+  void logOperacao("PDF_GENERATED", "alunos", aluno.id, { tipo: "FICHA_ALUNO" });
+
   return doc.output("blob");
 }
 
@@ -727,52 +760,38 @@ export interface Profile {
   updated_at: string;
 }
 
+async function getCurrentUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw new Error("Usuário não autenticado");
+  return data.user.id;
+}
+
 export const profileApi = {
-  get: async (userId: string) => {
+  get: async () => {
+    const userId = await getCurrentUserId();
     const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .maybeSingle();
     if (error) throw error;
-    if (!data) {
-      const { data: inserted } = await supabase
-        .from("profiles")
-        .insert({ id: userId, display_name: "" })
-        .select()
-        .single();
-      return inserted as Profile;
-    }
+    return data as Profile | null;
+  },
+
+  update: async (updates: Partial<Pick<Profile, "display_name">>) => {
+    const userId = await getCurrentUserId();
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({ ...updates, updated_at: new Date().toISOString() })
+      .eq("id", userId)
+      .select()
+      .single();
+    if (error) throw error;
     return data as Profile;
   },
 
-  update: async (userId: string, updates: Partial<Pick<Profile, "display_name">>) => {
-    const { data: existing } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("id", userId)
-      .maybeSingle();
-    if (existing) {
-      const { data, error } = await supabase
-        .from("profiles")
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq("id", userId)
-        .select()
-        .single();
-      if (error) throw error;
-      return data as Profile;
-    } else {
-      const { data, error } = await supabase
-        .from("profiles")
-        .insert({ id: userId, ...updates, updated_at: new Date().toISOString() })
-        .select()
-        .single();
-      if (error) throw error;
-      return data as Profile;
-    }
-  },
-
-  uploadAvatar: async (userId: string, file: File) => {
+  uploadAvatar: async (file: File) => {
+    const userId = await getCurrentUserId();
     const filePath = `${userId}/${Date.now()}_${file.name}`;
     const { error: uploadError } = await supabase.storage
       .from("avatars")
