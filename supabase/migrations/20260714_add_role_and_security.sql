@@ -20,6 +20,37 @@ $$;
 
 grant execute on function public.is_staff() to authenticated;
 
+-- Funcoes security definer para evitar RLS recursivo em policies de profiles.
+-- Quando uma policy referencia profiles via subquery, dispara a policy
+-- de SELECT, que pode referenciar profiles de novo, criando loop infinito.
+-- Essas funcoes bypassam RLS (security definer) e quebram o ciclo.
+create or replace function public.is_admin()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where id = auth.uid() and role = 'admin'
+  )
+$$;
+
+grant execute on function public.is_admin() to authenticated;
+
+create or replace function public.my_role()
+returns text
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select role::text from public.profiles where id = auth.uid()
+$$;
+
+grant execute on function public.my_role() to authenticated;
+
 -- ============================================================================
 -- 1) Adicionar coluna `role` em `profiles`
 -- ============================================================================
@@ -43,7 +74,7 @@ create policy "Users can update own profile (not role)"
   using (auth.uid() = id)
   with check (
     auth.uid() = id
-    and role = (select role from public.profiles where id = auth.uid())
+    and role = public.my_role()
   );
 
 drop policy if exists "Users can view own profile" on public.profiles;
@@ -52,14 +83,14 @@ create policy "Users can view own profile, admins view all"
   to authenticated
   using (
     auth.uid() = id
-    or exists (select 1 from public.profiles p2 where p2.id = auth.uid() and p2.role = 'admin')
+    or public.is_admin()
   );
 
 create policy "Admins can update any profile role"
   on public.profiles for update
   to authenticated
-  using (exists (select 1 from public.profiles p2 where p2.id = auth.uid() and p2.role = 'admin'))
-  with check (exists (select 1 from public.profiles p2 where p2.id = auth.uid() and p2.role = 'admin'));
+  using (public.is_admin())
+  with check (public.is_admin());
 
 -- ============================================================================
 -- 3) Remover policies permissivas das tabelas de dados
