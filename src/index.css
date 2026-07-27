@@ -1,0 +1,199 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Primary - Tia Neuma Navy #01182C */
+    --primary: 208 96% 9%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Backgrounds */
+    --background: 260 15% 97%;
+    --foreground: 208 25% 12%;
+
+    /* Cards */
+    --card: 0 0% 100%;
+    --card-foreground: 208 25% 12%;
+
+    /* Popovers */
+    --popover: 0 0% 100%;
+    --popover-foreground: 208 25% 12%;
+
+    /* Secondary */
+    --secondary: 260 10% 94%;
+    --secondary-foreground: 208 30% 18%;
+
+    /* Muted elements */
+    --muted: 260 10% 95%;
+    --muted-foreground: 208 8% 42%;
+
+    /* Accent - Tia Neuma Orange */
+    --accent: 25 80% 90%;
+    --accent-foreground: 208 40% 15%;
+
+    /* Destructive */
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Borders and inputs */
+    --border: 260 10% 88%;
+    --input: 260 10% 90%;
+    --ring: 208 50% 30%;
+
+    --radius: 0.75rem;
+
+    /* Sidebar - Tia Neuma Navy */
+    --sidebar-background: 208 50% 30%;
+    --sidebar-foreground: 260 20% 92%;
+    --sidebar-primary: 25 86% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 25 86% 56%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 208 30% 20%;
+    --sidebar-ring: 25 86% 56%;
+
+    /* Status colors */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 200 98% 39%;
+    --info-foreground: 0 0% 100%;
+  }
+
+  .dark {
+    --primary: 208 50% 35%;
+    --primary-foreground: 0 0% 100%;
+    
+    --background: 208 25% 10%;
+    --foreground: 260 15% 95%;
+
+    --card: 208 22% 13%;
+    --card-foreground: 260 15% 95%;
+
+    --popover: 208 22% 13%;
+    --popover-foreground: 260 15% 95%;
+
+    --secondary: 208 22% 16%;
+    --secondary-foreground: 260 15% 95%;
+
+    --muted: 208 18% 16%;
+    --muted-foreground: 260 8% 60%;
+
+    --accent: 208 22% 19%;
+    --accent-foreground: 260 15% 95%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 208 18% 18%;
+    --input: 208 18% 18%;
+    --ring: 25 86% 56%;
+
+    --sidebar-background: 208 40% 12%;
+    --sidebar-foreground: 260 15% 90%;
+    --sidebar-primary: 25 86% 56%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 25 70% 50%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 208 18% 18%;
+    --sidebar-ring: 25 86% 56%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+@layer utilities {
+  .glass-effect {
+    @apply backdrop-blur-xl bg-white/80 border border-white/20 shadow-xl;
+  }
+  
+  .gradient-primary {
+    background: linear-gradient(135deg, #01182C 0%, #0a2540 100%);
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes scaleIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  .stat-card {
+    @apply relative overflow-hidden;
+  }
+  
+  .stat-card::before {
+    content: '';
+    @apply absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 transition-opacity duration-300;
+  }
+  
+  .stat-card:hover::before {
+    @apply opacity-100;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
