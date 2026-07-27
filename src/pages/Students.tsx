@@ -24,6 +24,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -206,20 +207,16 @@ export default function Students() {
       doc.text(`Total de alunos: ${students.length}`, margin, margin + 16);
       doc.text(`Emitido em: ${new Date().toLocaleDateString("pt-BR")}`, pageWidth - margin, margin + 16, { align: "right" });
 
-      const tableColumn = ["Nome", "Série", "Turno", "Responsável", "Telefone", "Telefone 2", "Telefone 3"];
+      const tableColumn = ["Nome", "Série", "Turno", "Responsável", "Telefone 1", "Telefone 2"];
       const tableRows = students.map((s) => {
         const mat = getMatriculaAtiva(s);
-        const idx = s.telefone_principal ?? 1;
-        const nomeResp = idx === 3 ? s.nometelefone3 : idx === 2 ? s.nometelefone2 : s.nometelefone1;
-        const telPrincipal = idx === 3 ? s.telefone3 : idx === 2 ? s.telefone2 : s.telefone1;
         return [
           s.nome,
           mat?.serie || s.serie || "—",
           mat?.turno || s.turno || "—",
-          nomeResp || "—",
-          telPrincipal || "—",
+          s.responsavelfinanceiro || s.nomedamae || "—",
+          s.telefone1 || "—",
           s.telefone2 || "—",
-          s.telefone3 || "—",
         ];
       });
 
@@ -390,7 +387,7 @@ export default function Students() {
           <div>
             <Label className="text-xs font-medium text-muted-foreground mb-2 block">Status</Label>
             <div className="space-y-1.5">
-              {["Ativo", "Transferido", "Desistente"].map((s) => (
+              {["Ativo", "Inativo"].map((s) => (
                 <label key={s} className="flex items-center gap-2 text-sm cursor-pointer">
                   <Checkbox
                     checked={selectedStatuses.includes(s)}
@@ -442,7 +439,7 @@ export default function Students() {
                   </button>
                 </TableHead>
                 <TableHead className="hidden md:table-cell">Responsável</TableHead>
-                <TableHead className="hidden lg:table-cell">Telefone</TableHead>
+                <TableHead className="hidden lg:table-cell">Telefone 1</TableHead>
                 <TableHead className="hidden lg:table-cell">Telefone 2</TableHead>
                 <TableHead className="hidden xl:table-cell">Telefone 3</TableHead>
                 <TableHead className="w-10"></TableHead>
@@ -462,14 +459,12 @@ export default function Students() {
                   </TableCell>
                   <TableCell>
                     <Badge
-                      variant="outline"
-                      className={(() => {
-                        const status = student.status || student.situacao;
-                        if (status === "Ativo") return "bg-success/10 text-success border-success/20";
-                        if (status === "Transferido") return "bg-amber-100 text-amber-700 border-amber-200";
-                        if (status === "Desistente") return "bg-destructive/10 text-destructive border-destructive/20";
-                        return "bg-muted text-muted-foreground";
-                      })()}
+                      variant={(student.status || student.situacao) === "Ativo" ? "default" : "secondary"}
+                      className={
+                        (student.status || student.situacao) === "Ativo"
+                          ? "bg-success/10 text-success border-success/20 hover:bg-success/20"
+                          : "bg-muted text-muted-foreground"
+                      }
                     >
                       {student.status || student.situacao}
                     </Badge>
@@ -477,18 +472,10 @@ export default function Students() {
                   <TableCell className="text-muted-foreground">{matriculaAtiva?.serie || "Sem matrícula"}</TableCell>
                   <TableCell className="text-muted-foreground">{matriculaAtiva?.turno || "—"}</TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground">
-                    {(() => {
-                      const idx = student.telefone_principal ?? 1;
-                      const nome = idx === 3 ? student.nometelefone3 : idx === 2 ? student.nometelefone2 : student.nometelefone1;
-                      return nome || "—";
-                    })()}
+                    {student.responsavelfinanceiro || student.nomedamae || "—"}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-muted-foreground">
-                    {(() => {
-                      const idx = student.telefone_principal ?? 1;
-                      const tel = idx === 3 ? student.telefone3 : idx === 2 ? student.telefone2 : student.telefone1;
-                      return tel || "—";
-                    })()}
+                    {student.telefone1 || "—"}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-muted-foreground">
                     {student.telefone2 || "—"}
@@ -542,6 +529,9 @@ export default function Students() {
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Selecionar Série</DialogTitle>
+            <DialogDescription className="sr-only">
+              Escolha a série para gerar a lista em PDF.
+            </DialogDescription>
           </DialogHeader>
           <Select value={selectedSerie} onValueChange={setSelectedSerie}>
             <SelectTrigger className="rounded-lg">

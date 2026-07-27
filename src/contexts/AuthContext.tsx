@@ -44,6 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     }, 3000);
 
+    let subscription: { unsubscribe: () => void } | null = null;
+
     (async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
@@ -63,25 +65,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
       }
-    })();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (cancelled) return;
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const r = await fetchRole(session.user.id);
+
+      const { data: { subscription: sub } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (cancelled) return;
-        setRole(r);
-      } else {
-        setRole(null);
-      }
-    });
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          const r = await fetchRole(session.user.id);
+          if (cancelled) return;
+          setRole(r);
+        } else {
+          setRole(null);
+        }
+      });
+      subscription = sub;
+    })();
 
     return () => {
       cancelled = true;
       clearTimeout(safetyTimeout);
-      subscription.unsubscribe();
+      subscription?.unsubscribe();
     };
   }, []);
 

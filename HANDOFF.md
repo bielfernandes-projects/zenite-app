@@ -55,6 +55,7 @@ VITE_API_URL=http://localhost:8000
 - Supabase Auth com fallback **modo demo** automático (se `VITE_SUPABASE_URL` não estiver configurada)
 - Modo demo: login aceita qualquer credencial, usuário fictício
 - Token JWT injetado via interceptor do Axios
+- `onAuthStateChange` é configurado **depois** de `getSession()` resolver para evitar race condition no lock do GoTrue
 
 ## API — Supabase Direto (`lib/api.ts`)
 
@@ -159,3 +160,10 @@ Campos: `id`, `aluno_id`, `ano_letivo`, `serie`, `turno`, `status` (Ativo/Conclu
 9. **Dashboard** — métricas do dashboard (`dashboardApi.getMetrics()`) são computadas em memória a partir de `alunosApi.list()`, não de uma query dedicada
 10. **Gráfico de matrículas** — usa `ano_letivo` da tabela `matriculas`, agrupado por ano (BarChart)
 11. **Ficha do Aluno** — PDF gerado via `gerarFichaAlunoPDF()` com dados pessoais + histórico de matrícula
+
+## Correções Recentes
+
+- **Dialog sem Description** — Adicionado `<DialogDescription className="sr-only">` nos dialogs de `ImportStudents.tsx` e `Students.tsx` para eliminar warning de acessibilidade (`aria-describedby`)
+- **Select uncontrolled → controlled** — Adicionado `defaultValues` no `useForm()` de `StudentForm.tsx` para garantir que todos os campos Select tenham valor definido desde o primeiro render
+- **Supabase GoTrue lock timeout** — Reordenado `AuthContext.tsx` para que `onAuthStateChange` só seja inscrito após `getSession()` completar, evitando disputa pelo lock de autenticação
+- **Performance da importação** — `ImportStudents.tsx` agora usa `Promise.allSettled` com batches de 5 em paralelo, em vez de requests sequenciais

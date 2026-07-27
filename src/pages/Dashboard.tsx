@@ -39,7 +39,7 @@ export default function Dashboard() {
   const enrollmentByYear = useMemo(() => {
     const data = YEAR_RANGE.map((year) => ({ name: year, total: 0 }));
     (matriculas as Matricula[]).forEach((m) => {
-      if (m.status !== "Ativo") return;
+      if (m.status !== "Ativo" && m.status !== "Concluído") return;
       const yearStr = m.ano_letivo?.toString();
       if (yearStr && YEAR_RANGE.includes(yearStr)) {
         const entry = data.find((d) => d.name === yearStr);

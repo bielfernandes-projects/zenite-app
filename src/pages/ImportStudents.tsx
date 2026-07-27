@@ -6,9 +6,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Trash2,
+  Pencil,
   Download,
   FileText,
 } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,10 +22,32 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { parseDocxFiles, ParsedStudent } from "@/lib/docxParser";
 import { generateModelDocx, RECOGNIZED_FIELDS } from "@/lib/docxModel";
 import { alunosApi, matriculasApi } from "@/lib/api";
 import { toast } from "sonner";
+import { GRADES, SHIFTS } from "@/lib/constants";
+
+const grades = GRADES;
+const shifts = SHIFTS;
 
 interface ImportResult {
   imported: number;
@@ -35,6 +59,8 @@ export default function ImportStudents() {
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [editForm, setEditForm] = useState<ParsedStudent | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = useCallback(async (files: FileList | null) => {
@@ -93,71 +119,95 @@ export default function ImportStudents() {
     setStudents((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const startEdit = (idx: number) => {
+    setEditingIdx(idx);
+    setEditForm({ ...students[idx] });
+  };
+
+  const saveEdit = () => {
+    if (editingIdx === null || !editForm) return;
+    setStudents((prev) =>
+      prev.map((s, i) => (i === editingIdx ? editForm : s))
+    );
+    setEditingIdx(null);
+    setEditForm(null);
+  };
+
+  const prepareStudentData = (student: ParsedStudent): Record<string, unknown> => {
+    const { matriculas, _sourceFile: _source, ...parsedData } = student;
+
+    const primeiroAno = matriculas?.[0];
+    if (primeiroAno?.serie) parsedData.serie = primeiroAno.serie;
+    if (primeiroAno?.turno) parsedData.turno = primeiroAno.turno;
+    if (primeiroAno?.ano) parsedData.anodamatricula = primeiroAno.ano;
+    if (primeiroAno?.datamatricula) parsedData.datadamatricula = primeiroAno.datamatricula;
+
+    if (!parsedData.serie) parsedData.serie = "1º Ano";
+    if (!parsedData.turno) parsedData.turno = "Manhã";
+    if (!parsedData.status) parsedData.status = "Ativo";
+    if (!parsedData.situacao) parsedData.situacao = "Ativo";
+    if (!parsedData.ano_letivo) parsedData.ano_letivo = new Date().getFullYear();
+
+    const { cor, datadovencimento, ...restData } = parsedData;
+    const alunoData: Record<string, unknown> = { ...restData };
+    if (cor) alunoData["raça"] = cor;
+    if (datadovencimento) alunoData.datadovencimento = Number(datadovencimento);
+
+    const datePattern = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
+    for (const key of ["datanascimento", "datadamatricula", "datanascimentoresponsavelfin"]) {
+      const val = String(alunoData[key] || "");
+      if (val && datePattern.test(val)) {
+        const [d, m, y] = val.split("/");
+        alunoData[key] = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+      } else if (val && !/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+        console.warn(`Campo ${key} descartado (valor inválido: "${val}")`);
+        delete alunoData[key];
+      }
+    }
+
+    return alunoData;
+  };
+
+  const BATCH_SIZE = 5;
+
   const importMutation = useMutation({
     mutationFn: async (toImport: ParsedStudent[]) => {
       let imported = 0;
       const errors: string[] = [];
+      const now = new Date().toISOString().split("T")[0];
+      const currentYear = new Date().getFullYear();
 
-      for (const student of toImport) {
-        try {
-          const { matriculas, _sourceFile: _source, ...parsedData } = student;
+      for (let i = 0; i < toImport.length; i += BATCH_SIZE) {
+        const batch = toImport.slice(i, i + BATCH_SIZE);
+        const results = await Promise.allSettled(
+          batch.map(async (student) => {
+            const alunoData = prepareStudentData(student);
+            const created = await alunosApi.create(alunoData as Partial<Aluno>);
 
-          const primeiroAno = matriculas?.[0];
-          if (primeiroAno?.serie) {
-            parsedData.serie = primeiroAno.serie;
-          }
-          if (primeiroAno?.turno) {
-            parsedData.turno = primeiroAno.turno;
-          }
-          if (primeiroAno?.ano) {
-            parsedData.anodamatricula = primeiroAno.ano;
-          }
-          if (primeiroAno?.datamatricula) {
-            parsedData.datadamatricula = primeiroAno.datamatricula;
-          }
-
-          if (!parsedData.serie) parsedData.serie = "1º Ano";
-          if (!parsedData.turno) parsedData.turno = "Manhã";
-          if (!parsedData.status) parsedData.status = "Ativo";
-          if (!parsedData.situacao) parsedData.situacao = "Ativo";
-          if (!parsedData.ano_letivo) parsedData.ano_letivo = new Date().getFullYear();
-
-          const { cor, datadovencimento, ...restData } = parsedData;
-          const alunoData: Record<string, unknown> = { ...restData };
-          if (cor) alunoData["raça"] = cor;
-          if (datadovencimento) alunoData.datadovencimento = Number(datadovencimento);
-
-          const datePattern = /^\d{1,2}\/\d{1,2}\/\d{4}$/;
-          for (const key of ["datanascimento", "datadamatricula", "datanascimentoresponsavelfin"]) {
-            const val = String(alunoData[key] || "");
-            if (val && datePattern.test(val)) {
-              const [d, m, y] = val.split("/");
-              alunoData[key] = `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
-            } else if (val && val && !/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-              console.warn(`Campo ${key} descartado (valor inválido: "${val}")`);
-              delete alunoData[key];
+            try {
+              await matriculasApi.create({
+                aluno_id: created.id,
+                serie: alunoData.serie as string || "1º Ano",
+                turno: alunoData.turno as string || "Manhã",
+                ano_letivo: currentYear,
+                data_matricula: now,
+                status: "Ativo",
+              });
+            } catch {
+              // Matrícula é opcional
             }
+
+            return created;
+          })
+        );
+
+        for (let j = 0; j < results.length; j++) {
+          if (results[j].status === "fulfilled") {
+            imported++;
+          } else {
+            console.error("Erro ao importar aluno:", results[j].reason);
+            errors.push(batch[j].nome || "Nome desconhecido");
           }
-
-          const created = await alunosApi.create(alunoData as Partial<Aluno>);
-
-          try {
-            await matriculasApi.create({
-              aluno_id: created.id,
-              serie: alunoData.serie as string || "1º Ano",
-              turno: alunoData.turno as string || "Manhã",
-              ano_letivo: new Date().getFullYear(),
-              data_matricula: new Date().toISOString().split("T")[0],
-              status: "Ativo",
-            });
-          } catch {
-            // Matrícula é opcional
-          }
-
-          imported++;
-        } catch (e) {
-          console.error("Erro ao importar aluno:", e);
-          errors.push(student.nome || "Nome desconhecido");
         }
       }
 
@@ -376,6 +426,14 @@ export default function ImportStudents() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-7 w-7"
+                          onClick={() => startEdit(idx)}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="h-7 w-7 text-destructive"
                           onClick={() => removeStudent(idx)}
                         >
@@ -409,6 +467,449 @@ export default function ImportStudents() {
         </Card>
       )}
 
+      <Dialog
+        open={editingIdx !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingIdx(null);
+            setEditForm(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar aluno</DialogTitle>
+            <DialogDescription className="sr-only">
+              Edite os dados do aluno importado antes de salvar.
+            </DialogDescription>
+          </DialogHeader>
+          {editForm && (
+            <Tabs defaultValue="dados" className="w-full">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="dados">Dados</TabsTrigger>
+                <TabsTrigger value="filiacao">Filiação</TabsTrigger>
+                <TabsTrigger value="contato">Contato</TabsTrigger>
+                <TabsTrigger value="documentos">Docs</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="dados" className="space-y-3 mt-4">
+                <div>
+                  <Label>Nome completo</Label>
+                  <Input
+                    value={editForm.nome}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, nome: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label>Data de nascimento</Label>
+                    <Input
+                      value={editForm.datanascimento || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, datanascimento: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Naturalidade</Label>
+                    <Input
+                      value={editForm.naturalidade || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, naturalidade: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Cor/Raça</Label>
+                    <Input
+                      value={editForm.cor || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, cor: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label>Série</Label>
+                    <Select
+                      value={editForm.matriculas?.[0]?.serie || ""}
+                      onValueChange={(v) => {
+                        const m = [...(editForm.matriculas || [])];
+                        if (m.length === 0) m.push({ serie: v });
+                        else m[0] = { ...m[0], serie: v };
+                        setEditForm({ ...editForm, matriculas: m });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {grades.map((g) => (
+                          <SelectItem key={g} value={g}>{g}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Turno</Label>
+                    <Select
+                      value={editForm.matriculas?.[0]?.turno || ""}
+                      onValueChange={(v) => {
+                        const m = [...(editForm.matriculas || [])];
+                        if (m.length === 0) m.push({ serie: "", turno: v });
+                        else m[0] = { ...m[0], turno: v };
+                        setEditForm({ ...editForm, matriculas: m });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {shifts.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Ano matrícula</Label>
+                    <Input
+                      type="number"
+                      value={editForm.matriculas?.[0]?.ano || ""}
+                      onChange={(e) => {
+                        const m = [...(editForm.matriculas || [])];
+                        const v = e.target.value ? Number(e.target.value) : undefined;
+                        if (m.length === 0) m.push({ serie: "", ano: v });
+                        else m[0] = { ...m[0], ano: v };
+                        setEditForm({ ...editForm, matriculas: m });
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>CPF</Label>
+                    <Input
+                      value={editForm.cpf || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, cpf: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>NIS</Label>
+                    <Input
+                      value={editForm.nis || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, nis: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Data vencimento</Label>
+                    <Input
+                      value={editForm.datadovencimento || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, datadovencimento: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Valor mensalidade (R$)</Label>
+                    <Input
+                      value={(editForm as Record<string, unknown>).valormensalidade != null ? String((editForm as Record<string, unknown>).valormensalidade) : ""}
+                      onChange={(e) =>
+                        setEditForm({
+                          ...editForm,
+                          valormensalidade: e.target.value ? Number(e.target.value) : undefined,
+                        } as ParsedStudent & { valormensalidade?: number })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2 pt-6">
+                    <Checkbox
+                      checked={editForm.possuiirmao || false}
+                      onCheckedChange={(checked) =>
+                        setEditForm({ ...editForm, possuiirmao: !!checked })
+                      }
+                    />
+                    <Label>Possui irmão(s) na escola</Label>
+                  </div>
+                  <div>
+                    <Label>Nome do irmão</Label>
+                    <Input
+                      value={editForm.nomeirmao || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, nomeirmao: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="filiacao" className="space-y-3 mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pai</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <Label>Nome do pai</Label>
+                    <Input
+                      value={editForm.nomedopai || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, nomedopai: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>RG do pai</Label>
+                    <Input
+                      value={editForm.rgdopai || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, rgdopai: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>CPF do pai</Label>
+                  <Input
+                    value={editForm.cpfdopai || ""}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, cpfdopai: e.target.value })
+                    }
+                  />
+                </div>
+
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-2">Mãe</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="col-span-2">
+                    <Label>Nome da mãe</Label>
+                    <Input
+                      value={editForm.nomedamae || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, nomedamae: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>RG da mãe</Label>
+                    <Input
+                      value={editForm.rgmae || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, rgmae: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>CPF da mãe</Label>
+                  <Input
+                    value={editForm.cpfmae || ""}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, cpfmae: e.target.value })
+                    }
+                  />
+                </div>
+
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-2">Filiação</p>
+                <div>
+                  <Label>Filiação (responsável)</Label>
+                  <Input
+                    value={editForm.filiacaoresponsavelfin || ""}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, filiacaoresponsavelfin: e.target.value })
+                    }
+                  />
+                </div>
+              </TabsContent>
+
+              <TabsContent value="contato" className="space-y-3 mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Responsável financeiro</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <Label>Nome</Label>
+                    <Input
+                      value={editForm.responsavelfinanceiro || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, responsavelfinanceiro: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Data nascimento</Label>
+                    <Input
+                      value={editForm.datanascimentoresponsavelfin || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, datanascimentoresponsavelfin: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>RG</Label>
+                    <Input
+                      value={editForm.rgrespfin || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, rgrespfin: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>CPF</Label>
+                  <Input
+                    value={editForm.cpfrespfin || ""}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, cpfrespfin: e.target.value })
+                    }
+                  />
+                </div>
+
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-2">Telefones</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Celular do pai</Label>
+                    <Input
+                      value={editForm.telefone1 || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, telefone1: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Celular da mãe</Label>
+                    <Input
+                      value={editForm.telefone2 || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, telefone2: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label>Telefone fixo / Outros</Label>
+                  <Input
+                    value={editForm.telefone3 || ""}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, telefone3: e.target.value })
+                    }
+                  />
+                </div>
+
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground pt-2">Endereço</p>
+                <div>
+                  <Label>Logradouro</Label>
+                  <Input
+                    value={editForm.logradouro || ""}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, logradouro: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label>CEP</Label>
+                    <Input
+                      value={editForm.cep || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, cep: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Cidade</Label>
+                    <Input
+                      value={editForm.cidadetelefone || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, cidadetelefone: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Estado</Label>
+                    <Input
+                      value={editForm.estadotelefone || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, estadotelefone: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="documentos" className="space-y-3 mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cartório</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label>Cartório</Label>
+                    <Input
+                      value={editForm.nomedocartorio || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, nomedocartorio: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Nº Termo</Label>
+                    <Input
+                      value={editForm.numerodotermo || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, numerodotermo: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label>Livro</Label>
+                    <Input
+                      value={editForm.livro || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, livro: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Folha</Label>
+                    <Input
+                      value={editForm.folha || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, folha: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>Matrícula cartório</Label>
+                    <Input
+                      value={editForm.matriculadocartorio || ""}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, matriculadocartorio: e.target.value })
+                      }
+                    />
+                  </div>
+                </div>
+              </TabsContent>
+            </Tabs>
+          )}
+          <DialogFooter className="pt-4">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingIdx(null);
+                setEditForm(null);
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={saveEdit}>Salvar alterações</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
