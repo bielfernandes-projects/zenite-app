@@ -2,9 +2,9 @@ export const GRADES = ["1º Ano", "2º Ano", "3º Ano", "4º Ano", "5º Ano"] as
 
 export const SHIFTS = ["Manhã", "Tarde"] as const;
 
-export const STATUSES = ["Ativo", "Inativo"] as const;
+export const STATUSES = ["Ativo", "Transferido", "Desistente"] as const;
 
-export const ENROLLMENT_STATUSES = ["Ativo", "Concluído", "Transferido", "Cancelado"] as const;
+export const ENROLLMENT_STATUSES = ["Ativo", "Transferido", "Desistente"] as const;
 
 export const RACES = ["Branca", "Preta", "Parda", "Amarela", "Indígena", "Não Declarada"] as const;
 

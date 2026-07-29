@@ -48,6 +48,7 @@ export interface Aluno {
   nometelefone2?: string;
   telefone3?: string;
   nometelefone3?: string;
+  telefone_principal?: number;
   logradouro?: string;
   numero?: string;
   complemento?: string;
@@ -68,7 +69,7 @@ export interface DashboardMetrics {
   por_serie: { serie: string; count: number }[];
 }
 
-const ALUNOS_LIST_FIELDS = "id, nome, genero, serie, turno, situacao, status, ano_letivo, responsavelfinanceiro, nomedamae, telefone1, telefone2, telefone3, criado_em, atualizado_em";
+const ALUNOS_LIST_FIELDS = "id, nome, genero, serie, turno, situacao, status, ano_letivo, responsavelfinanceiro, nomedamae, telefone1, telefone2, telefone3, telefone_principal, criado_em, atualizado_em";
 const MATRICULAS_LIST_FIELDS = "id, aluno_id, ano_letivo, serie, turno, status, data_matricula, created_at";
 
 export const alunosApi = {
@@ -206,7 +207,7 @@ export interface Matricula {
   ano_letivo: number;
   serie: string;
   turno: string;
-  status: "Ativo" | "Concluído" | "Transferido" | "Cancelado";
+  status: "Ativo" | "Transferido" | "Desistente";
   data_matricula?: string;
   created_at: string;
 }

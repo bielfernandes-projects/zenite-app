@@ -90,6 +90,7 @@ const studentSchema = z.object({
   nometelefone2: z.string().nullable().optional(),
   telefone3: z.string().nullable().optional(),
   nometelefone3: z.string().nullable().optional(),
+  telefone_principal: z.coerce.number().min(1).max(3).default(1),
   complemento: z.string().nullable().optional(),
 });
 
@@ -162,7 +163,8 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
       turno: "Manhã",
       genero: "",
       status: "Ativo",
-      raça: "",
+      raça: "Não declarada",
+      telefone_principal: 1,
       possuiirmao: false,
       datadamatricula: new Date().toISOString().split("T")[0],
     },
@@ -181,6 +183,7 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
   const telefone1Val = watch("telefone1");
   const telefone2Val = watch("telefone2");
   const telefone3Val = watch("telefone3");
+  const telefonePrincipalVal = watch("telefone_principal");
   const serieVal = watch("serie");
   const turnoVal = watch("turno");
   const generoVal = watch("genero");
@@ -234,6 +237,7 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
         nometelefone2: student.nometelefone2,
         telefone3: student.telefone3,
         nometelefone3: student.nometelefone3,
+        telefone_principal: student.telefone_principal ?? 1,
         logradouro: student.logradouro,
         numero: student.numero,
         complemento: student.complemento,
@@ -249,7 +253,8 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
         turno: "Manhã",
         genero: "",
         status: "Ativo",
-        raça: "",
+        raça: "Não declarada",
+        telefone_principal: 1,
         possuiirmao: false,
       });
     }
@@ -280,6 +285,7 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
     filiacaoresponsavelfin: "filiacao",
     telefone1: "contato", nometelefone1: "contato", telefone2: "contato",
     nometelefone2: "contato", telefone3: "contato", nometelefone3: "contato",
+    telefone_principal: "contato",
     logradouro: "contato", numero: "contato", complemento: "contato",
     bairro: "contato", cep: "contato", cidadetelefone: "contato",
     estadotelefone: "contato",
@@ -364,7 +370,8 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
                     <SelectTrigger className={fieldClass}><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Ativo">Ativo</SelectItem>
-                      <SelectItem value="Inativo">Inativo</SelectItem>
+                      <SelectItem value="Transferido">Transferido</SelectItem>
+                      <SelectItem value="Desistente">Desistente</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -518,7 +525,21 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
             <TabsContent value="contato" className="space-y-4 mt-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="telefone1">Telefone 1 *</Label>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Label htmlFor="telefone1">Telefone 1 *</Label>
+                    <button
+                      type="button"
+                      onClick={() => setValue("telefone_principal", 1)}
+                      className={cn(
+                        "text-xs px-2 py-0.5 rounded-full border transition-colors",
+                        telefonePrincipalVal === 1
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-input text-muted-foreground hover:border-primary",
+                      )}
+                    >
+                      Principal
+                    </button>
+                  </div>
                   <Input
                     id="telefone1"
                     value={telefone1Val || ""}
@@ -535,7 +556,21 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="telefone2">Telefone 2</Label>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Label htmlFor="telefone2">Telefone 2</Label>
+                    <button
+                      type="button"
+                      onClick={() => setValue("telefone_principal", 2)}
+                      className={cn(
+                        "text-xs px-2 py-0.5 rounded-full border transition-colors",
+                        telefonePrincipalVal === 2
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-input text-muted-foreground hover:border-primary",
+                      )}
+                    >
+                      Principal
+                    </button>
+                  </div>
                   <Input
                     id="telefone2"
                     value={telefone2Val || ""}
@@ -550,7 +585,21 @@ export function StudentForm({ open, onOpenChange, student, onSave }: StudentForm
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="telefone3">Telefone 3</Label>
+                  <div className="flex items-center gap-2 mb-1">
+                    <Label htmlFor="telefone3">Telefone 3</Label>
+                    <button
+                      type="button"
+                      onClick={() => setValue("telefone_principal", 3)}
+                      className={cn(
+                        "text-xs px-2 py-0.5 rounded-full border transition-colors",
+                        telefonePrincipalVal === 3
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-input text-muted-foreground hover:border-primary",
+                      )}
+                    >
+                      Principal
+                    </button>
+                  </div>
                   <Input
                     id="telefone3"
                     value={telefone3Val || ""}

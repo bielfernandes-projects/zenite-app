@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Edit, Trash2, MapPin, Calendar, User, Contact, Loader2, GraduationCap, Phone, Plus, BookOpen, Printer } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, MapPin, CalendarIcon, User, Contact, Loader2, GraduationCap, Phone, Plus, BookOpen, Printer } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +37,15 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,7 +67,7 @@ import { GRADES, SHIFTS } from "@/lib/constants";
 
 const grades = GRADES;
 const shifts = SHIFTS;
-const matriculaStatuses = ["Ativo", "Concluído", "Transferido", "Cancelado"];
+const matriculaStatuses = ["Ativo", "Transferido", "Desistente"];
 
 const matriculaSchema = z.object({
   ano_letivo: z.coerce.number().min(2020, "Ano letivo inválido").max(2030),
@@ -229,9 +238,8 @@ export default function StudentProfile() {
   const getStatusBadgeColor = (status: string) => {
     const colors: Record<string, string> = {
       Ativo: "bg-success/10 text-success border-success/20 hover:bg-success/20",
-      Concluído: "bg-blue-100 text-blue-700 border-blue-200",
       Transferido: "bg-amber-100 text-amber-700 border-amber-200",
-      Cancelado: "bg-destructive/10 text-destructive border-destructive/20",
+      Desistente: "bg-destructive/10 text-destructive border-destructive/20",
     };
     return colors[status] || "bg-muted text-muted-foreground";
   };
@@ -310,7 +318,7 @@ export default function StudentProfile() {
               </div>
               <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
+                  <CalendarIcon className="h-4 w-4" />
                   {formatDate(student.datanascimento)}
                 </span>
                 <span className="flex items-center gap-1">
@@ -697,12 +705,36 @@ export default function StudentProfile() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="data_matricula">Data da Matrícula *</Label>
-              <Input
-                id="data_matricula"
-                type="date"
-                {...matriculaForm.register("data_matricula")}
-              />
+              <Label>Data da Matrícula *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !matriculaForm.watch("data_matricula") && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {matriculaForm.watch("data_matricula")
+                      ? format(new Date(matriculaForm.watch("data_matricula") + "T12:00:00"), "dd/MM/yyyy")
+                      : "Selecione uma data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={matriculaForm.watch("data_matricula") ? new Date(matriculaForm.watch("data_matricula") + "T12:00:00") : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        matriculaForm.setValue("data_matricula", format(date, "yyyy-MM-dd"), { shouldValidate: true });
+                      }
+                    }}
+                    initialFocus
+                    locale={ptBR}
+                  />
+                </PopoverContent>
+              </Popover>
               {matriculaForm.formState.errors.data_matricula && (
                 <p className="text-xs text-destructive">{matriculaForm.formState.errors.data_matricula.message}</p>
               )}

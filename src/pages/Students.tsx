@@ -207,7 +207,7 @@ export default function Students() {
       doc.text(`Total de alunos: ${students.length}`, margin, margin + 16);
       doc.text(`Emitido em: ${new Date().toLocaleDateString("pt-BR")}`, pageWidth - margin, margin + 16, { align: "right" });
 
-      const tableColumn = ["Nome", "Série", "Turno", "Responsável", "Telefone 1", "Telefone 2"];
+      const tableColumn = ["Nome", "Série", "Turno", "Responsável", "Telefone Principal", "Telefone 2"];
       const tableRows = students.map((s) => {
         const mat = getMatriculaAtiva(s);
         return [
@@ -215,7 +215,7 @@ export default function Students() {
           mat?.serie || s.serie || "—",
           mat?.turno || s.turno || "—",
           s.responsavelfinanceiro || s.nomedamae || "—",
-          s.telefone1 || "—",
+          s.telefone_principal === 2 ? s.telefone2 : s.telefone_principal === 3 ? s.telefone3 : s.telefone1 || "—",
           s.telefone2 || "—",
         ];
       });
@@ -387,7 +387,7 @@ export default function Students() {
           <div>
             <Label className="text-xs font-medium text-muted-foreground mb-2 block">Status</Label>
             <div className="space-y-1.5">
-              {["Ativo", "Inativo"].map((s) => (
+              {["Ativo", "Transferido", "Desistente"].map((s) => (
                 <label key={s} className="flex items-center gap-2 text-sm cursor-pointer">
                   <Checkbox
                     checked={selectedStatuses.includes(s)}
@@ -439,7 +439,7 @@ export default function Students() {
                   </button>
                 </TableHead>
                 <TableHead className="hidden md:table-cell">Responsável</TableHead>
-                <TableHead className="hidden lg:table-cell">Telefone 1</TableHead>
+                <TableHead className="hidden lg:table-cell">Telefone Principal</TableHead>
                 <TableHead className="hidden lg:table-cell">Telefone 2</TableHead>
                 <TableHead className="hidden xl:table-cell">Telefone 3</TableHead>
                 <TableHead className="w-10"></TableHead>
@@ -459,11 +459,13 @@ export default function Students() {
                   </TableCell>
                   <TableCell>
                     <Badge
-                      variant={(student.status || student.situacao) === "Ativo" ? "default" : "secondary"}
+                      variant="outline"
                       className={
-                        (student.status || student.situacao) === "Ativo"
-                          ? "bg-success/10 text-success border-success/20 hover:bg-success/20"
-                          : "bg-muted text-muted-foreground"
+                        {
+                          Ativo: "bg-success/10 text-success border-success/20 hover:bg-success/20",
+                          Transferido: "bg-amber-100 text-amber-700 border-amber-200",
+                          Desistente: "bg-destructive/10 text-destructive border-destructive/20",
+                        }[student.status || student.situacao || ""]
                       }
                     >
                       {student.status || student.situacao}
@@ -475,7 +477,7 @@ export default function Students() {
                     {student.responsavelfinanceiro || student.nomedamae || "—"}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-muted-foreground">
-                    {student.telefone1 || "—"}
+                    {student.telefone_principal === 2 ? student.telefone2 : student.telefone_principal === 3 ? student.telefone3 : student.telefone1 || "—"}
                   </TableCell>
                   <TableCell className="hidden lg:table-cell text-muted-foreground">
                     {student.telefone2 || "—"}
