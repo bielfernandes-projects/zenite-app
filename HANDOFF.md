@@ -131,11 +131,11 @@ zenite-app/
 
 ## Modelo `Aluno` (interface em `lib/api.ts`)
 
-Campos: `id`, `nome`, `serie` (1º–5º Ano), `turno` (Manhã/Tarde/Integral), `genero` (Masculino/Feminino), `status`, `situacao`, `ano_letivo`, `anodamatricula`, `datadamatricula`, `datanascimento`, `naturalidade`, `cidade`, `estado`, `valormensalidade`, `datadovencimento`, `nomedopai`, `rgdopai`, `cpfdopai`, `nomedamae`, `rgmae`, `cpfmae`, `responsavelfinanceiro`, `rgrespfin`, `cpfrespfin`, `datanascimentoresponsavelfin`, `filiacaoresponsavelfin`, `telefone1-3`, `nometelefone1-3`, `logradouro`, `numero`, `complemento`, `bairro`, `cep`, `cidadetelefone`, `estadotelefone`, `rg`, `cpf`, `nis`, `cia`, `raça`, dados de cartório (`nomedocartorio`, `numerodotermo`, `livro`, `folha`, `matriculadocartorio`), `possuiirmao`, `nomeirmao`, `escola_id`, `criado_em`, `atualizado_em`.
+Campos: `id`, `nome`, `serie` (1º–5º Ano), `turno` (Manhã/Tarde/Integral), `genero` (Masculino/Feminino), `status`, `situacao`, `ano_letivo`, `anodamatricula`, `datadamatricula`, `datanascimento`, `naturalidade`, `cidade`, `estado`, `valormensalidade`, `datadovencimento`, `nomedopai`, `rgdopai`, `cpfdopai`, `nomedamae`, `rgmae`, `cpfmae`, `responsavelfinanceiro`, `rgrespfin`, `cpfrespfin`, `datanascimentoresponsavelfin`, `filiacaoresponsavelfin`, `telefone1-3`, `nometelefone1-3`, `telefone_principal` (1, 2 ou 3 — indica qual telefone é o principal), `logradouro`, `numero`, `complemento`, `bairro`, `cep`, `cidadetelefone`, `estadotelefone`, `rg`, `cpf`, `nis`, `cia`, `raça`, dados de cartório (`nomedocartorio`, `numerodotermo`, `livro`, `folha`, `matriculadocartorio`), `possuiirmao`, `nomeirmao`, `escola_id`, `criado_em`, `atualizado_em`.
 
 ## Modelo `Matricula` (interface em `lib/api.ts`)
 
-Campos: `id`, `aluno_id`, `ano_letivo`, `serie`, `turno`, `status` (Ativo/Concluído/Transferido/Cancelado), `data_matricula`, `created_at`.
+Campos: `id`, `aluno_id`, `ano_letivo`, `serie`, `turno`, `status` (Ativo/Transferido/Desistente), `data_matricula`, `created_at`.
 
 ## Design System
 
@@ -167,3 +167,9 @@ Campos: `id`, `aluno_id`, `ano_letivo`, `serie`, `turno`, `status` (Ativo/Conclu
 - **Select uncontrolled → controlled** — Adicionado `defaultValues` no `useForm()` de `StudentForm.tsx` para garantir que todos os campos Select tenham valor definido desde o primeiro render
 - **Supabase GoTrue lock timeout** — Reordenado `AuthContext.tsx` para que `onAuthStateChange` só seja inscrito após `getSession()` completar, evitando disputa pelo lock de autenticação
 - **Performance da importação** — `ImportStudents.tsx` agora usa `Promise.allSettled` com batches de 5 em paralelo, em vez de requests sequenciais
+- **ImportStudents: diálogo de edição removido** — Removeu o botão Pencil e todo o `<Dialog>` com 4 abas que permitia editar alunos diretamente na importação; limpeza de imports não usados
+- **maskPhone: early return** — `maskPhone()` retorna `""` imediatamente se a string ficar vazia após limpeza, prevenindo erro de runtime
+- **StudentForm: raça padrão + telefone principal** — Raça padrão `"Não declarada"`; adicionado campo `telefone_principal` com botões "Principal" toggle ao lado de cada telefone
+- **StudentProfile: date picker + status** — Campo "Data da Matrícula" migrado para Popover+Calendar (shadcn); status alterados para `["Ativo","Transferido","Desistente"]` com cores específicas
+- **Students: coluna Telefone Principal** — Coluna "Telefone 1" renomeada para "Telefone Principal", valor dinâmico baseado em `telefone_principal`; badges de status com cores específicas
+- **Status unificados** — `constants.ts`, `StudentForm.tsx`, `Students.tsx`, `StudentProfile.tsx`: todos os lugares usam `["Ativo","Transferido","Desistente"]`
